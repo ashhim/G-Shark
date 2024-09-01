@@ -207,3 +207,21 @@ footer h5 {
     font-family: 'Arial', sans-serif; /* Consistent with the rest of the design */
     background-color: black; /* Light background color for the footer */
 }
+
+
+/* CSS for active state */
+.active {
+    transform: scale(1.05);
+    box-shadow: 0 6px 12px rgba(0, 255, 0, 0.5);
+}
+
+/* Ensure hover effects also apply when active */
+.spec-item.active img {
+    transform: scale(1.1);
+}
+
+ul li.active {
+    background: #333;
+    transform: translateX(5px);
+    box-shadow: 0 4px 8px rgba(0, 255, 0, 0.3);
+}
