@@ -19,49 +19,48 @@
             <h2></h2>
             <img src="Gshark.png" alt="G-Shark Logo" class="branding-logo">
             <br><br>
-			
-			<p>The G-Shark Deauther Watch merges the rugged design of a G-Shock with advanced hacking capabilities, making it a versatile tool for network analysis and security testing.</p>
+            <p>The G-Shark Watch is a deauther device capable of targeting and disconnecting Wi-Fi devices within seconds. Named "G-Shark" due to its G-Shock watch body and inspiration from the network analysis tool Wireshark, this watch not only disconnects devices from Wi-Fi but also performs evil twin attacks.</p>
         </div>
     </section>
+
     <section id="specifications">
         <div class="container">
             <h2>Specifications</h2>
-            <div class="spec-item">
+            <div class="spec-item hover-trigger"> <!-- Add hover-trigger class -->
                 <img src="esp8266.jpeg" alt="ESP8266 MotherBoard">
                 <div>
                     <h3>MotherBoard</h3>
                     <p>ESP8266</p>
                 </div>
             </div>
-            <div class="spec-item">
+            <div class="spec-item hover-trigger"> <!-- Add hover-trigger class -->
                 <img src="oleddisplay.jpeg" alt="OLED Display">
                 <div>
                     <h3>Display</h3>
                     <p>0.96 inch I2C Interface OLED Display</p>
                 </div>
             </div>
-			            <div class="spec-item">
+            <div class="spec-item hover-trigger">
                 <img src="antena.jpeg" alt="External Antenna">
                 <div>
                     <h3>Antenna</h3>
                     <p>External portable antenna for wide-range attacks</p>
                 </div>
             </div>
-            <div class="spec-item">
+            <div class="spec-item hover-trigger">
                 <img src="battery.jpeg" alt="LiPo Battery">
                 <div>
                     <h3>Battery</h3>
                     <p>Li 3.7V 700mAh LiPo Battery</p>
                 </div>
             </div>
-            <div class="spec-item">
+            <div class="spec-item hover-trigger">
                 <img src="gshock.jpeg" alt="G-Shock Watch Body">
                 <div>
                     <h3>Watch Body</h3>
-                    <p>Watches from G-Shock Segments</p>
+                    <p>G-Shock Model</p>
                 </div>
             </div>
-
         </div>
     </section>
 
@@ -69,14 +68,14 @@
         <div class="container">
             <h2>Functions</h2>
             <ul>
-                <li><strong>Deauth:</strong> Disconnect all devices from any Wi-Fi network, with the ability to target specific devices for disconnection.</li>
-                <li><strong>Beacon:</strong> Flood networks with fake access points to confuse users by creating multiple false Wi-Fi names, making it harder to locate the genuine network.</li>
-                <li><strong>Probe:</strong> Inject a large number of users to crash Wi-Fi strength, causing connected devices to appear connected but with no internet access.</li>
-                <li><strong>Packet Monitor:</strong> Capture and analyze network traffic.</li>
-                <li><strong>Clock:</strong> Display time</li>
-                <li><strong>Scanning Wi-Fi APs and Stations:</strong> Identify available Wi-Fi access points and connected devices.</li>
-                <li><strong>Cloning SSIDs:</strong> Clone Wi-Fi network names to flood networks with fake SSIDs, enhancing Beacon and Probe attacks.</li>
-                <li><strong>Random Mode:</strong> Generate random fake SSIDs to flood networks with Beacon and Probe attacks for testing network resilience.</li>
+                <li class="hover-trigger"><strong>Deauth:</strong> Disconnect all devices from any Wi-Fi network, with the ability to target specific devices for disconnection.</li>
+                <li class="hover-trigger"><strong>Beacon:</strong> Flood networks with fake access points to confuse users by creating multiple false Wi-Fi names, making it harder to locate the genuine network.</li>
+                <li class="hover-trigger"><strong>Probe:</strong> Inject a large number of users to crash Wi-Fi strength, causing connected devices to appear connected but with no internet access.</li>
+                <li class="hover-trigger"><strong>Packet Monitor:</strong> Capture and analyze network traffic.</li>
+                <li class="hover-trigger"><strong>Clock:</strong> Display time.</li>
+                <li class="hover-trigger"><strong>Scanning Wi-Fi APs and Stations:</strong> Identify available Wi-Fi access points and connected devices.</li>
+                <li class="hover-trigger"><strong>Cloning SSIDs:</strong> Clone Wi-Fi network names to flood networks with fake SSIDs, enhancing Beacon and Probe attacks.</li>
+                <li class="hover-trigger"><strong>Random Mode:</strong> Generate random fake SSIDs to flood networks with Beacon and Probe attacks for testing network resilience.</li>
             </ul>
         </div>
     </section>
@@ -86,12 +85,12 @@
             <h2>Wi-Fi Device Information</h2>
             <p>The G-Shark Deauther Watch can display detailed information about detected Wi-Fi devices:</p>
             <ul>
-                <li><strong>Wi-Fi Name:</strong> Network name (SSID).</li>
-                <li><strong>Encryption Type:</strong> Security protocol used (WEP, WPA, WPA2, etc.).</li>
-                <li><strong>RSSI:</strong> Signal strength indicator.</li>
-                <li><strong>Channel Number:</strong> Wi-Fi channel used by the network.</li>
-                <li><strong>SSID:</strong> Service Set Identifier (network name).</li>
-                <li><strong>Connected Devices:</strong> List of devices currently connected to the network.</li>
+                <li class="hover-trigger"><strong>Wi-Fi Name:</strong> Network name (SSID).</li>
+                <li class="hover-trigger"><strong>Encryption Type:</strong> Security protocol used (WEP, WPA, WPA2, etc.).</li>
+                <li class="hover-trigger"><strong>RSSI:</strong> Signal strength indicator.</li>
+                <li class="hover-trigger"><strong>Channel Number:</strong> Wi-Fi channel used by the network.</li>
+                <li class="hover-trigger"><strong>SSID:</strong> Service Set Identifier (network name).</li>
+                <li class="hover-trigger"><strong>Connected Devices:</strong> List of devices currently connected to the network.</li>
             </ul>
         </div>
     </section>
@@ -101,5 +100,25 @@
             <h5>&copy; G-Shark Watches by <b>####iM</b></h5>
         </div>
     </footer>
+
+    <script>
+        document.addEventListener('scroll', function() {
+            const windowHeight = window.innerHeight;
+            const middleOfScreen = windowHeight / 2;
+            const elements = document.querySelectorAll('.hover-trigger');
+
+            elements.forEach(element => {
+                const rect = element.getBoundingClientRect();
+                const elementMiddle = rect.top + (rect.height / 2);
+
+                // Check if the middle of the element is near the middle of the screen
+                if (elementMiddle >= middleOfScreen - 20 && elementMiddle <= middleOfScreen + 20) {
+                    element.classList.add('active');
+                } else {
+                    element.classList.remove('active');
+                }
+            });
+        });
+    </script>
 </body>
 </html>
