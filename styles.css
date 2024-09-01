@@ -21,14 +21,14 @@ h1:hover {
 
 
 @keyframes colorSwitch {
-    0% { color: White; }
-    50% { color: green; }
+    0% { color: green; }
+    50% { color: white; }
     100% { color: White; }
 }
 
 p,li {
 
-    animation: colorSwitch 0.09s infinite;
+    animation: colorSwitch 2s infinite;
 }
 
 /* Set font and background */
@@ -85,11 +85,10 @@ header::before {
 }
 
 .branding-logo {
-    max-width: 300px;
-    border: 4px solid red;
+    max-width: 220px;
     border-radius: 10px;
-    box-shadow: 0 4px 8px rgba(255, 0, 0, 0.5);
-    transition: transform 0.3s, box-shadow 0.3s;
+    box-shadow: 0 6px 15px rgba(255, 0, 0, 0.5);
+    transition: transform 0.9s, box-shadow 0.3s;
     background-color: black;
 }
 
