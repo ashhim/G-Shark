@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hacker Simulation</title>
+    <style>
+        body {
+            background-color: black;
+            color: green;
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        #terminal {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding: 10px;
+        }
+
+        .line {
+            display: flex;
+        }
+
+        .cursor {
+            width: 10px;
+            height: 20px;
+            background-color: green;
+            margin-left: 5px;
+            animation: blink 1s infinite step-end;
+        }
+
+        @keyframes blink {
+            50% {
+                opacity: 0;
+            }
+        }
+
+        .command {
+            color: green;
+        }
+
+        .output {
+            color: lightgreen;
+        }
+
+    </style>
+</head>
+<body>
+
+<div id="terminal">
+    <div class="line">
+        <span class="command">C:\> </span><span class="output">Initializing system...</span>
+    </div>
+    <div class="line">
+        <span class="command">C:\> </span><span class="output">Connecting to remote device...</span>
+    </div>
+    <div class="line">
+        <span class="command">C:\> </span><span class="output">Bypassing security...</span>
+    </div>
+    <div class="line">
+        <span class="command">C:\> </span><span class="output">Access granted. Welcome, admin.</span>
+    </div>
+    <div class="line">
+        <span class="command">C:\> </span><span class="output">Downloading data...</span>
+    </div>
+    <div class="line">
+        <span class="command">C:\> </span><span class="output">Hacking device... Please wait.</span>
+    </div>
+    <div class="line">
+        <span class="command">C:\> </span><span class="output">ERROR: Unauthorized access attempt detected.</span>
+    </div>
+    <div class="line">
+        <span class="command">C:\> </span><span class="output">System compromised. Shutting down...</span>
+    </div>
+    <div class="line">
+        <span class="command">C:\> </span><span class="output">Rebooting device...</span>
+    </div>
+    <div class="line">
+        <span class="command">C:\> </span><span class="output">Access complete.</span>
+    </div>
+    <div class="line">
+        <span class="command">C:\> </span><span class="output">Device is now under control.</span>
+    </div>
+    <div class="cursor"></div>
+</div>
+
+<script>
+    // JavaScript to simulate terminal text output
+    let lines = [
+        'Initializing system...',
+        'Connecting to remote device...',
+        'Bypassing security...',
+        'Access granted. Welcome, admin.',
+        'Downloading data...',
+        'Hacking device... Please wait.',
+        'ERROR: Unauthorized access attempt detected.',
+        'System compromised. Shutting down...',
+        'Rebooting device...',
+        'Access complete.',
+        'Device is now under control.'
+    ];
+
+    let terminal = document.getElementById('terminal');
+    let cursor = document.querySelector('.cursor');
+    let lineIndex = 0;
+
+    function typeLine(line, index) {
+        let commandSpan = document.createElement('span');
+        commandSpan.classList.add('command');
+        commandSpan.textContent = 'C:\\> ';
+        let outputSpan = document.createElement('span');
+        outputSpan.classList.add('output');
+        let outputText = line;
+        let i = 0;
+
+        terminal.appendChild(commandSpan);
+        terminal.appendChild(outputSpan);
+
+        function typeChar() {
+            outputSpan.textContent = line.substring(0, i);
+            i++;
+            if (i <= line.length) {
+                setTimeout(typeChar, 100);
+            }
+        }
+
+        typeChar();
+    }
+
+    function simulateHacking() {
+        if (lineIndex < lines.length) {
+            typeLine(lines[lineIndex], lineIndex);
+            lineIndex++;
+            setTimeout(simulateHacking, 2000);
+        } else {
+            cursor.style.display = 'none';  // Hide the cursor once done
+        }
+    }
+
+    // Start simulating the hacking process after page load
+    window.onload = () => {
+        setTimeout(simulateHacking, 1000);
+    };
+</script>
+
+</body>
+</html>

