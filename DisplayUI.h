@@ -48,8 +48,8 @@ extern String right(String a, int len);
 extern String leftRight(String a, String b, int len);
 extern String replaceUtf8(String str, String r);
 
-const char D_INTRO_0[] PROGMEM = "Deauther";
-const char D_INTRO_1[] PROGMEM = "HASH";
+const char D_INTRO_0[] PROGMEM = "CRABOX";
+const char D_INTRO_1[] PROGMEM = "#iM";
 const char D_INTRO_2[] PROGMEM = DISPLAY_TEXT;
 const char D_RESETTING[] PROGMEM = "Resetting...";
 

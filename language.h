@@ -372,6 +372,8 @@ const char D_CLOCK_SET[] PROGMEM = "SET CLOCK";
 const char D_SCAN_APST[] PROGMEM = "SCAN AP + ST";
 const char D_SCAN_AP[] PROGMEM = "SCAN APs";
 const char D_SCAN_ST[] PROGMEM = "SCAN Stations";
+const char D_AUTOSCAN[] PROGMEM = "AUTOSCAN";
+const char D_SCANNING[] PROGMEM = "SCANNING";
 
 // SHOW MENU
 const char D_ACCESSPOINTS[] PROGMEM = "APs ";

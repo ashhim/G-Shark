@@ -127,6 +127,11 @@ void DisplayUI::setup() {
             scan.start(SCAN_MODE_STATIONS, 30000, SCAN_MODE_OFF, 0, true, wifi_channel);
             mode = DISPLAY_MODE::LOADSCAN;
         });
+        addMenuNode(&scanMenu, [this]() {
+            return scan.isAutoScanActive() ? str(D_SCANNING) : str(D_AUTOSCAN);
+        }, [this]() {
+            handleAutoScanMenuClick();
+        });
     });
 
     // SHOW MENU
@@ -341,7 +346,7 @@ void DisplayUI::setup() {
         addMenuNode(&stationMenu, [this]() {
             return str(D_AP) + stations.getAPStr(selectedID); // AP: someAP
         }, [this]() {
-            int apID = accesspoints.find(stations.getAP(selectedID));
+            int apID = stations.getAP(selectedID);
 
             if (apID >= 0) {
                 selectedID = apID;
@@ -532,6 +537,7 @@ void DisplayUI::update(bool force) {
     down->update();
     a->update();
     b->update();
+    updateAutoScanMenuAction();
 
     draw(force);
 
@@ -578,11 +584,17 @@ void DisplayUI::setupButtons() {
         scrollCounter = 0;
         scrollTime    = currentTime;
         buttonTime    = currentTime;
+        cancelAutoScanMenuAction();
 
         if (!tempOff) {
             if (mode == DISPLAY_MODE::MENU) {                 // when in menu, go up or down with cursor
                 if (currentMenu->selected > 0) currentMenu->selected--;
                 else currentMenu->selected = currentMenu->list->size() - 1;
+            } else if (mode == DISPLAY_MODE::AUTOSCAN_VIEW) {
+                if (accesspoints.count() > 0) {
+                    if (autoScanRow > 0) autoScanRow--;
+                    else autoScanRow = accesspoints.count() - 1;
+                }
             } else if (mode == DISPLAY_MODE::PACKETMONITOR) { // when in packet monitor, change channel
                 scan.setChannel(wifi_channel + 1);
             } else if (mode == DISPLAY_MODE::CLOCK) {         // when in clock, change time
@@ -595,10 +607,16 @@ void DisplayUI::setupButtons() {
         scrollCounter = 0;
         scrollTime    = currentTime;
         buttonTime    = currentTime;
+        cancelAutoScanMenuAction();
         if (!tempOff) {
             if (mode == DISPLAY_MODE::MENU) {                 // when in menu, go up or down with cursor
                 if (currentMenu->selected > 0) currentMenu->selected--;
                 else currentMenu->selected = currentMenu->list->size() - 1;
+            } else if (mode == DISPLAY_MODE::AUTOSCAN_VIEW) {
+                if (accesspoints.count() > 0) {
+                    if (autoScanRow > 0) autoScanRow--;
+                    else autoScanRow = accesspoints.count() - 1;
+                }
             } else if (mode == DISPLAY_MODE::PACKETMONITOR) { // when in packet monitor, change channel
                 scan.setChannel(wifi_channel + 1);
             } else if (mode == DISPLAY_MODE::CLOCK) {         // when in clock, change time
@@ -612,10 +630,16 @@ void DisplayUI::setupButtons() {
         scrollCounter = 0;
         scrollTime    = currentTime;
         buttonTime    = currentTime;
+        cancelAutoScanMenuAction();
         if (!tempOff) {
             if (mode == DISPLAY_MODE::MENU) {                 // when in menu, go up or down with cursor
                 if (currentMenu->selected < currentMenu->list->size() - 1) currentMenu->selected++;
                 else currentMenu->selected = 0;
+            } else if (mode == DISPLAY_MODE::AUTOSCAN_VIEW) {
+                if (accesspoints.count() > 0) {
+                    if (autoScanRow < accesspoints.count() - 1) autoScanRow++;
+                    else autoScanRow = 0;
+                }
             } else if (mode == DISPLAY_MODE::PACKETMONITOR) { // when in packet monitor, change channel
                 scan.setChannel(wifi_channel - 1);
             } else if (mode == DISPLAY_MODE::CLOCK) {         // when in clock, change time
@@ -628,10 +652,16 @@ void DisplayUI::setupButtons() {
         scrollCounter = 0;
         scrollTime    = currentTime;
         buttonTime    = currentTime;
+        cancelAutoScanMenuAction();
         if (!tempOff) {
             if (mode == DISPLAY_MODE::MENU) {                 // when in menu, go up or down with cursor
                 if (currentMenu->selected < currentMenu->list->size() - 1) currentMenu->selected++;
                 else currentMenu->selected = 0;
+            } else if (mode == DISPLAY_MODE::AUTOSCAN_VIEW) {
+                if (accesspoints.count() > 0) {
+                    if (autoScanRow < accesspoints.count() - 1) autoScanRow++;
+                    else autoScanRow = 0;
+                }
             } else if (mode == DISPLAY_MODE::PACKETMONITOR) { // when in packet monitor, change channel
                 scan.setChannel(wifi_channel - 1);
             }
@@ -656,9 +686,13 @@ void DisplayUI::setupButtons() {
                     }
                     break;
 
+                case DISPLAY_MODE::AUTOSCAN_VIEW:
+                    closeAutoScanView();
+                    break;
+
                 case DISPLAY_MODE::PACKETMONITOR:
                 case DISPLAY_MODE::LOADSCAN:
-                    scan.stop();
+                    if (mode == DISPLAY_MODE::PACKETMONITOR || !scan.isAutoScanActive()) scan.stop();
                     mode = DISPLAY_MODE::MENU;
                     break;
 
@@ -693,12 +727,17 @@ void DisplayUI::setupButtons() {
         if (!tempOff) {
             switch (mode) {
                 case DISPLAY_MODE::MENU:
+                    cancelAutoScanMenuAction();
                     goBack();
+                    break;
+
+                case DISPLAY_MODE::AUTOSCAN_VIEW:
+                    closeAutoScanView();
                     break;
 
                 case DISPLAY_MODE::PACKETMONITOR:
                 case DISPLAY_MODE::LOADSCAN:
-                    scan.stop();
+                    if (mode == DISPLAY_MODE::PACKETMONITOR || !scan.isAutoScanActive()) scan.stop();
                     mode = DISPLAY_MODE::MENU;
                     break;
 
@@ -749,6 +788,10 @@ void DisplayUI::draw(bool force) {
 
             case DISPLAY_MODE::LOADSCAN:
                 drawLoadingScan();
+                break;
+
+            case DISPLAY_MODE::AUTOSCAN_VIEW:
+                drawAutoScanView();
                 break;
 
             case DISPLAY_MODE::PACKETMONITOR:
@@ -835,6 +878,48 @@ void DisplayUI::drawLoadingScan() {
     drawString(4, center(percentage, maxLen));
 }
 
+void DisplayUI::drawAutoScanView() {
+    display.setFont(ArialMT_Plain_10);
+
+    int count = accesspoints.count();
+    int rowsPerPage = 5;
+    int rowHeight = 10;
+
+    if (count <= 0) autoScanRow = 0;
+    else if (autoScanRow >= count) autoScanRow = count - 1;
+    else if (autoScanRow < 0) autoScanRow = 0;
+
+    drawString(0, leftRight(scan.isAutoScanActive() ? str(D_SCANNING) : str(D_AUTOSCAN), String(count), maxLen));
+
+    if (count <= 0) {
+        drawString(2, center(String(F("Scanning APs")), maxLen));
+        return;
+    }
+
+    int row = (autoScanRow / rowsPerPage) * rowsPerPage;
+
+    for (int i = row; i < count && i < row + rowsPerPage; i++) {
+        String tmp = accesspoints.getSSID(i);
+        int    tmpLen = tmp.length();
+
+        if ((autoScanRow == i) && (tmpLen >= maxLen)) {
+            tmp = tmp + tmp;
+            tmp = tmp.substring(scrollCounter, scrollCounter + maxLen - 1);
+
+            if (((scrollCounter > 0) && (scrollTime < currentTime - scrollSpeed)) ||
+                ((scrollCounter == 0) && (scrollTime < currentTime - scrollSpeed * 4))) {
+                scrollTime = currentTime;
+                scrollCounter++;
+            }
+
+            if (scrollCounter > tmpLen) scrollCounter = 0;
+        }
+
+        tmp = (autoScanRow == i ? CURSOR : SPACE) + tmp;
+        drawString(0, (i - row + 1) * rowHeight, tmp);
+    }
+}
+
 void DisplayUI::drawPacketMonitor() {
     double scale = scan.getScaleFactor(sreenHeight - lineHeight - 2);
 
@@ -918,6 +1003,62 @@ void DisplayUI::changeMenu(Menu* menu) {
 
 void DisplayUI::goBack() {
     if (currentMenu->parentMenu) changeMenu(currentMenu->parentMenu);
+}
+
+void DisplayUI::openAutoScanView() {
+    scrollCounter = 0;
+    scrollTime    = currentTime;
+    autoScanRow   = 0;
+    mode          = DISPLAY_MODE::AUTOSCAN_VIEW;
+}
+
+void DisplayUI::closeAutoScanView() {
+    scrollCounter = 0;
+    scrollTime    = currentTime;
+    mode          = DISPLAY_MODE::MENU;
+}
+
+void DisplayUI::handleAutoScanMenuClick() {
+    if (!scan.isAutoScanActive()) {
+        cancelAutoScanMenuAction();
+        scan.start(SCAN_MODE_AUTOSCAN, 0, SCAN_MODE_AUTOSCAN, 0, true, wifi_channel);
+        openAutoScanView();
+        return;
+    }
+
+    if (autoScanMenuActionPending && (currentTime - autoScanMenuClickTime <= 1000)) {
+        cancelAutoScanMenuAction();
+        scan.stop();
+        mode = DISPLAY_MODE::MENU;
+        return;
+    }
+
+    autoScanMenuActionPending = true;
+    autoScanMenuClickTime     = currentTime;
+}
+
+void DisplayUI::updateAutoScanMenuAction() {
+    if (!autoScanMenuActionPending) return;
+
+    if (!scan.isAutoScanActive() || (mode != DISPLAY_MODE::MENU) || (currentMenu != &scanMenu) || !isAutoScanMenuSelected()) {
+        cancelAutoScanMenuAction();
+        return;
+    }
+
+    if (currentTime - autoScanMenuClickTime > 1000) {
+        cancelAutoScanMenuAction();
+        openAutoScanView();
+    }
+}
+
+void DisplayUI::cancelAutoScanMenuAction() {
+    autoScanMenuActionPending = false;
+    autoScanMenuClickTime     = 0;
+}
+
+bool DisplayUI::isAutoScanMenuSelected() {
+    return currentMenu && (currentMenu == &scanMenu) && (currentMenu->list->size() > 0) &&
+           (currentMenu->selected == currentMenu->list->size() - 1);
 }
 
 void DisplayUI::refreshAttackMenu() {

@@ -75,7 +75,7 @@ class Stations {
 
     private:
         struct Station {
-            uint8_t   ap;
+            uint16_t  ap;
             uint8_t   ch;
             uint8_t * mac;
             uint32_t* pkts;

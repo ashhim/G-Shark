@@ -126,15 +126,19 @@ String Stations::getAPStr(int num) {
 }
 
 uint8_t* Stations::getAPMac(int num) {
-    if (!check(num)) return 0;
+    int apNum = getAP(num);
 
-    return WiFi.BSSID(list->get(num).ap);
+    if (apNum < 0) return 0;
+
+    return accesspoints.getMac(apNum);
 }
 
 String Stations::getAPMacStr(int num) {
     if (!check(num)) return String();
 
     uint8_t* mac = getAPMac(num);
+
+    if (!mac) return String();
 
     return bytesToStr(mac, 6);
 }

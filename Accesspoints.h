@@ -19,7 +19,7 @@ extern String fixUtf8(String str);
 extern String bytesToStr(const uint8_t* b, uint32_t size);
 
 struct AP {
-    uint8_t id;
+    uint16_t id;
     String  ssid;
     uint8_t ch;
     int     rssi;
@@ -37,6 +37,7 @@ class Accesspoints {
         void sortAfterChannel();
 
         void add(uint8_t id, bool selected);
+        void addOrUpdate(uint8_t id, bool selected);
 
         void print(int num);
         void print(int num, bool header, bool footer);
@@ -52,6 +53,7 @@ class Accesspoints {
         void printSelected();
         void selectAll();
         void deselectAll();
+        void clear();
         void removeAll();
 
         String getSSID(int num);
@@ -62,13 +64,14 @@ class Accesspoints {
         String getSelectedStr(int num);
         uint8_t getCh(int num);
         uint8_t getEnc(int num);
-        uint8_t getID(int num);
+        uint16_t getID(int num);
         int getRSSI(int num);
         uint8_t* getMac(int num);
         bool getHidden(int num);
         bool getSelected(int num);
 
-        int find(uint8_t id);
+        int find(uint16_t id);
+        int find(uint8_t* mac);
 
         int count();
         int selected();
@@ -78,9 +81,11 @@ class Accesspoints {
 
     private:
         SimpleList<AP>* list;
+        uint16_t nextID = 0;
 
         bool internal_check(int num);
         void internal_select(int num);
         void internal_deselect(int num);
         void internal_remove(int num);
+        bool readScanAP(AP& ap, uint8_t id, bool selected);
 };

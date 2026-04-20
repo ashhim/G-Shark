@@ -6,6 +6,28 @@ Accesspoints::Accesspoints() {
     list = new SimpleList<AP>;
 }
 
+bool Accesspoints::readScanAP(AP& ap, uint8_t id, bool selected) {
+    ap.hidden = WiFi.isHidden(id);
+    ap.ch     = WiFi.channel(id);
+    ap.rssi   = WiFi.RSSI(id);
+    ap.enc    = WiFi.encryptionType(id);
+
+    if (ap.hidden) ap.ssid = String();
+    else {
+        ap.ssid = WiFi.SSID(id);
+        ap.ssid = ap.ssid.substring(0, 32);
+        ap.ssid = fixUtf8(ap.ssid);
+    }
+
+    uint8_t* bssid = WiFi.BSSID(id);
+
+    if (!bssid) return false;
+
+    memcpy(ap.mac, bssid, 6);
+    ap.selected = selected;
+    return true;
+}
+
 void Accesspoints::sort() {
     list->setCompare([](AP& a, AP& b) -> int {
         if (a.rssi > b.rssi) return -1;
@@ -31,27 +53,34 @@ void Accesspoints::sortAfterChannel() {
 }
 
 void Accesspoints::add(uint8_t id, bool selected) {
+    addOrUpdate(id, selected);
+}
+
+void Accesspoints::addOrUpdate(uint8_t id, bool selected) {
     AP ap;
 
-    ap.id       = id;
-    ap.hidden   = WiFi.isHidden(id);
-    ap.selected = selected;
-    ap.ch       = WiFi.channel(id);
-    ap.rssi     = WiFi.RSSI(id);
-    ap.enc      = WiFi.encryptionType(id);
+    if (!readScanAP(ap, id, selected)) return;
 
-    if (ap.hidden) ap.ssid = String();
-    else {
-        ap.ssid = WiFi.SSID(id);
-        ap.ssid = ap.ssid.substring(0, 32);
-        ap.ssid = fixUtf8(ap.ssid);
+    int existing = find(ap.mac);
+
+    if (existing >= 0) {
+        AP current = list->get(existing);
+
+        ap.id       = current.id;
+        ap.selected = current.selected || selected;
+
+        bool updated = (current.selected != ap.selected) || (current.hidden != ap.hidden) || (current.ch != ap.ch) ||
+                       (current.rssi != ap.rssi) || (current.enc != ap.enc) || (current.ssid != ap.ssid) ||
+                       (memcmp(current.mac, ap.mac, 6) != 0);
+
+        if (updated) {
+            list->replace(existing, ap);
+            changed = true;
+        }
+        return;
     }
 
-    uint8_t* bssid = WiFi.BSSID(id);
-
-    if (bssid) memcpy(ap.mac, bssid, 6);
-    else memset(ap.mac, 0, 6);
-
+    ap.id = nextID++;
     list->add(ap);
     changed = true;
 }
@@ -218,7 +247,7 @@ bool Accesspoints::getSelected(int num) {
     return list->get(num).selected;
 }
 
-uint8_t Accesspoints::getID(int num) {
+uint16_t Accesspoints::getID(int num) {
     if (!check(num)) return -1;
 
     return list->get(num).id;
@@ -295,17 +324,35 @@ void Accesspoints::deselectAll() {
     changed = true;
 }
 
+void Accesspoints::clear() {
+    list->clear();
+    nextID = 0;
+    changed = true;
+}
+
 void Accesspoints::removeAll() {
     while (count() > 0) internal_remove(0);
+    nextID = 0;
     prntln(AP_REMOVED_ALL);
     changed = true;
 }
 
-int Accesspoints::find(uint8_t id) {
+int Accesspoints::find(uint16_t id) {
     int s = list->size();
 
     for (int i = 0; i < s; i++) {
         if (list->get(i).id == id) return i;
+    }
+    return -1;
+}
+
+int Accesspoints::find(uint8_t* mac) {
+    if (!mac) return -1;
+
+    int s = list->size();
+
+    for (int i = 0; i < s; i++) {
+        if (memcmp(list->get(i).mac, mac, 6) == 0) return i;
     }
     return -1;
 }

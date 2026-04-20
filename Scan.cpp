@@ -77,10 +77,12 @@ void Scan::start(uint8_t mode, uint32_t time, uint8_t nextmode, uint32_t continu
     // time, scan_continue_mode, continueTime, channelHop, channel);
 
     /* AP Scan */
-    if ((mode == SCAN_MODE_APS) || (mode == SCAN_MODE_ALL)) {
+    if ((mode == SCAN_MODE_APS) || (mode == SCAN_MODE_ALL) || (mode == SCAN_MODE_AUTOSCAN)) {
         // remove old results
-        accesspoints.removeAll();
-        stations.removeAll();
+        if (mode != SCAN_MODE_AUTOSCAN) {
+            accesspoints.removeAll();
+            stations.removeAll();
+        }
         // start AP scan
         prntln(SC_START_AP);
         WiFi.scanNetworks(true, true);
@@ -195,19 +197,22 @@ void Scan::update() {
     }
 
     // APs
-    if ((scanMode == SCAN_MODE_APS) || (scanMode == SCAN_MODE_ALL)) {
+    if ((scanMode == SCAN_MODE_APS) || (scanMode == SCAN_MODE_ALL) || (scanMode == SCAN_MODE_AUTOSCAN)) {
         int16_t results = WiFi.scanComplete();
 
         if (results >= 0) {
             for (int16_t i = 0; i < results && i < 256; i++) {
-                if (channelHop || (WiFi.channel(i) == wifi_channel)) accesspoints.add(i, false);
+                if (channelHop || (WiFi.channel(i) == wifi_channel)) accesspoints.addOrUpdate(i, scanMode == SCAN_MODE_AUTOSCAN);
             }
-            accesspoints.sort();
+            if (scanMode != SCAN_MODE_AUTOSCAN) accesspoints.sort();
             accesspoints.printAll();
 
             if (scanMode == SCAN_MODE_ALL) {
                 delay(30);
                 start(SCAN_MODE_STATIONS);
+            }
+            else if (scanMode == SCAN_MODE_AUTOSCAN) {
+                start(SCAN_MODE_OFF);
             }
             else start(SCAN_MODE_OFF);
         }
@@ -370,6 +375,14 @@ bool Scan::isSniffing() {
     return scanMode == SCAN_MODE_STATIONS || scanMode == SCAN_MODE_SNIFFER;
 }
 
+bool Scan::isContinuous() {
+    return scan_continue_mode != SCAN_MODE_OFF;
+}
+
+bool Scan::isAutoScanActive() {
+    return scanMode == SCAN_MODE_AUTOSCAN || scan_continue_mode == SCAN_MODE_AUTOSCAN;
+}
+
 uint8_t Scan::getPercentage() {
     if (!isSniffing()) return 0;
 
@@ -429,6 +442,9 @@ String Scan::getMode() {
 
         case SCAN_MODE_SNIFFER:
             return str(SC_MODE_SNIFFER);
+
+        case SCAN_MODE_AUTOSCAN:
+            return str(D_AUTOSCAN);
 
         default:
             return String();

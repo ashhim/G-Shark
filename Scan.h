@@ -15,6 +15,7 @@
 #define SCAN_MODE_STATIONS 2
 #define SCAN_MODE_ALL 3
 #define SCAN_MODE_SNIFFER 4
+#define SCAN_MODE_AUTOSCAN 5
 #define SCAN_DEFAULT_TIME 15000
 #define SCAN_DEFAULT_CONTINUE_TIME 10000
 #define SCAN_PACKET_LIST_SIZE 64
@@ -57,6 +58,8 @@ class Scan {
         uint32_t countSelected();
         bool isScanning();
         bool isSniffing();
+        bool isContinuous();
+        bool isAutoScanActive();
 
         void nextChannel();
         void setChannel(uint8_t newChannel);
