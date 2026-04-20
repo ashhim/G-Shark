@@ -48,8 +48,8 @@ extern String right(String a, int len);
 extern String leftRight(String a, String b, int len);
 extern String replaceUtf8(String str, String r);
 
-const char D_INTRO_0[] PROGMEM = "CRABOX";
-const char D_INTRO_1[] PROGMEM = "#iM";
+const char D_INTRO_0[] PROGMEM = "####iM";
+const char D_INTRO_1[] PROGMEM = "CRABOX";
 const char D_INTRO_2[] PROGMEM = DISPLAY_TEXT;
 const char D_RESETTING[] PROGMEM = "Resetting...";
 
@@ -71,9 +71,7 @@ enum class DISPLAY_MODE { OFF,
                           BUTTON_TEST,
                           MENU,
                           LOADSCAN,
-                          AUTOSCAN_VIEW,
                           PACKETMONITOR,
-                          APSTMONITOR,
                           INTRO,
                           CLOCK,
                           CLOCK_DISPLAY,
@@ -134,21 +132,15 @@ class DisplayUI {
 
     private:
         int16_t selectedID    = 0; // i.e. access point ID to draw the apMenu
-        int16_t autoScanRow   = 0;
         uint8_t scrollCounter = 0; // for horizontal scrolling
-        uint16_t apMonitorHistory[SCAN_PACKET_LIST_SIZE] = { 0 };
-        uint16_t stMonitorHistory[SCAN_PACKET_LIST_SIZE] = { 0 };
 
         uint32_t scrollTime = 0;   // last time a character was moved
         uint32_t drawTime   = 0;   // last time a frame was drawn
         uint32_t startTime  = 0;   // when the screen was enabled
         uint32_t buttonTime = 0;   // last time a button was pressed
-        uint32_t autoScanMenuClickTime = 0;
-        uint32_t apstMonitorSampleTime = 0;
 
         bool enabled = false;      // display enabled
         bool tempOff = false;
-        bool autoScanMenuActionPending = false;
 
         // selected attack modes
         bool beaconSelected = false;
@@ -187,30 +179,15 @@ class DisplayUI {
         void drawButtonTest();
         void drawMenu();
         void drawLoadingScan();
-        void drawAutoScanView();
         void drawPacketMonitor();
-        void drawAPSTMonitor();
         void drawIntro();
         void drawResetting();
         void clearMenu(Menu* menu);
-        void updateAPSTMonitorHistory();
-        void resetAPSTMonitorHistory();
-        void drawGraphLine(uint16_t* values, uint16_t maxValue, int graphTop, int graphBottom, bool dotted);
-        void drawDottedLine(int x0, int y0, int x1, int y1);
-        int getGraphY(uint16_t value, uint16_t maxValue, int graphTop, int graphBottom);
 
         // menu functions
         void changeMenu(Menu* menu);
         void goBack();
         void createMenu(Menu* menu, Menu* parent, std::function<void()>build);
-        void openAutoScanView();
-        void closeAutoScanView();
-        void startAutoScan();
-        void startAPSTMonitor();
-        void handleAutoScanMenuClick();
-        void updateAutoScanMenuAction();
-        void cancelAutoScanMenuAction();
-        bool isAutoScanMenuSelected();
 
         void addMenuNode(Menu* menu, std::function<String()>getStr, std::function<void()>click, std::function<void()>hold);
         void addMenuNode(Menu* menu, std::function<String()>getStr, std::function<void()>click);

@@ -368,6 +368,12 @@ const char D_APST_MONITOR[] PROGMEM = "APST MONITOR";
 const char D_CLOCK[] PROGMEM = "CLOCK";
 const char D_CLOCK_DISPLAY[] PROGMEM = "CLOCK DISPLAY";
 const char D_CLOCK_SET[] PROGMEM = "SET CLOCK";
+const char D_TIME[] PROGMEM = "TIME";
+const char D_STOPWATCH[] PROGMEM = "STOPWATCH";
+const char D_TIMER[] PROGMEM = "TIMER";
+const char D_DISPLAY[] PROGMEM = "DISPLAY";
+const char D_VALUE[] PROGMEM = "VALUE";
+const char D_SET[] PROGMEM = "SET";
 
 // SCAN MENU
 const char D_SCAN_APST[] PROGMEM = "SCAN AP + ST";

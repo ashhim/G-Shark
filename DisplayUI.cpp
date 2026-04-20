@@ -50,6 +50,8 @@ void DisplayUI::configOff() {
 
 void DisplayUI::updatePrefix() {
     display.clear();
+    display.setTextAlignment(TEXT_ALIGN_LEFT);
+    display.setFont(DejaVu_Sans_Mono_12);
 }
 
 void DisplayUI::updateSuffix() {
@@ -106,7 +108,9 @@ void DisplayUI::setup() {
         addMenuNode(&mainMenu, D_APST_MONITOR, [this]() {   // APST MONITOR
             startAPSTMonitor();
         });
-        addMenuNode(&mainMenu, D_CLOCK, &clockMenu); // CLOCK
+        addMenuNode(&mainMenu, [this]() {
+            return getMainClockLabel();
+        }, &clockMenu);
 
 #ifdef HIGHLIGHT_LED
         addMenuNode(&mainMenu, D_LED, [this]() {     // LED
@@ -500,8 +504,7 @@ void DisplayUI::setup() {
             return leftRight(scan.isAutoScanActive() ? str(D_SCANNING) : str(D_AUTOSCAN),
                              String(accesspoints.count()), maxLen - 1);
         }, [this]() {
-            if (!scan.isAutoScanActive()) startAutoScan();
-            openAutoScanView();
+            handleAutoScanMenuClick();
         });
         addMenuNode(&attackMenu, [this]() { // *NAMEME
             return leftRight(b2a(namemeSelected) + str(D_NAMEME), (String)accesspoints.selected(), maxLen - 1);
@@ -530,15 +533,44 @@ void DisplayUI::setup() {
 
     // CLOCK MENU
     createMenu(&clockMenu, &mainMenu, [this]() {
-        addMenuNode(&clockMenu, D_CLOCK_DISPLAY, [this]() { // CLOCK
-            mode = DISPLAY_MODE::CLOCK_DISPLAY;
-            display.setFont(ArialMT_Plain_24);
-            display.setTextAlignment(TEXT_ALIGN_CENTER);
+        addMenuNode(&clockMenu, D_TIME, &timeMenu);
+        addMenuNode(&clockMenu, D_STOPWATCH, &stopwatchMenu);
+        addMenuNode(&clockMenu, D_TIMER, &timerMenu);
+    });
+
+    createMenu(&timeMenu, &clockMenu, [this]() {
+        addMenuNode(&timeMenu, D_DISPLAY, [this]() {
+            openClockDisplay(CLOCK_ITEM::TIME);
         });
-        addMenuNode(&clockMenu, D_CLOCK_SET, [this]() { // CLOCK SET TIME
-            mode = DISPLAY_MODE::CLOCK;
-            display.setFont(ArialMT_Plain_24);
-            display.setTextAlignment(TEXT_ALIGN_CENTER);
+        addMenuNode(&timeMenu, D_VALUE, [this]() {
+            openClockValueEditor(CLOCK_ITEM::TIME);
+        });
+        addMenuNode(&timeMenu, D_SET, [this]() {
+            setMainClockItem(CLOCK_ITEM::TIME);
+        });
+    });
+
+    createMenu(&stopwatchMenu, &clockMenu, [this]() {
+        addMenuNode(&stopwatchMenu, D_DISPLAY, [this]() {
+            openClockDisplay(CLOCK_ITEM::STOPWATCH);
+        });
+        addMenuNode(&stopwatchMenu, D_VALUE, [this]() {
+            openClockValueEditor(CLOCK_ITEM::STOPWATCH);
+        });
+        addMenuNode(&stopwatchMenu, D_SET, [this]() {
+            setMainClockItem(CLOCK_ITEM::STOPWATCH);
+        });
+    });
+
+    createMenu(&timerMenu, &clockMenu, [this]() {
+        addMenuNode(&timerMenu, D_DISPLAY, [this]() {
+            openClockDisplay(CLOCK_ITEM::TIMER);
+        });
+        addMenuNode(&timerMenu, D_VALUE, [this]() {
+            openClockValueEditor(CLOCK_ITEM::TIMER);
+        });
+        addMenuNode(&timerMenu, D_SET, [this]() {
+            setMainClockItem(CLOCK_ITEM::TIMER);
         });
     });
 
@@ -546,6 +578,9 @@ void DisplayUI::setup() {
 
     // set current menu to main menu
     changeMenu(&mainMenu);
+    clockTime           = currentTime;
+    stopwatchLastUpdate = currentTime;
+    timerLastUpdate     = currentTime;
     enabled   = true;
     startTime = currentTime;
 }
@@ -561,12 +596,19 @@ void DisplayUI::setupLED() {
 
 void DisplayUI::update(bool force) {
     if (!enabled) return;
+    if (!currentMenu) changeMenu(&mainMenu);
 
     up->update();
     down->update();
     a->update();
     b->update();
     updateAutoScanMenuAction();
+
+    if (mode == DISPLAY_MODE::INTRO) {
+        if (currentTime - startTime >= screenIntroTime) mode = DISPLAY_MODE::MENU;
+    } else {
+        updateClockRuntime();
+    }
 
     draw(force);
 
@@ -602,6 +644,15 @@ void DisplayUI::off() {
     }
 }
 
+void DisplayUI::showIntro() {
+    cancelAutoScanMenuAction();
+    startTime  = currentTime;
+    drawTime   = 0;
+    scrollTime = currentTime;
+    buttonTime = currentTime;
+    mode       = DISPLAY_MODE::INTRO;
+}
+
 void DisplayUI::setupButtons() {
     up   = new ButtonPullup(BUTTON_UP);
     down = new ButtonPullup(BUTTON_DOWN);
@@ -626,8 +677,8 @@ void DisplayUI::setupButtons() {
                 }
             } else if (mode == DISPLAY_MODE::PACKETMONITOR) { // when in packet monitor, change channel
                 scan.setChannel(wifi_channel + 1);
-            } else if (mode == DISPLAY_MODE::CLOCK) {         // when in clock, change time
-                setTime(clockHour, clockMinute + 1, clockSecond);
+            } else if (mode == DISPLAY_MODE::CLOCK) {         // when in clock, change value
+                adjustClockValue(1);
             }
         }
     });
@@ -648,8 +699,8 @@ void DisplayUI::setupButtons() {
                 }
             } else if (mode == DISPLAY_MODE::PACKETMONITOR) { // when in packet monitor, change channel
                 scan.setChannel(wifi_channel + 1);
-            } else if (mode == DISPLAY_MODE::CLOCK) {         // when in clock, change time
-                setTime(clockHour, clockMinute + 10, clockSecond);
+            } else if (mode == DISPLAY_MODE::CLOCK) {         // when in clock, change value
+                adjustClockValue(10);
             }
         }
     }, buttonDelay);
@@ -671,8 +722,8 @@ void DisplayUI::setupButtons() {
                 }
             } else if (mode == DISPLAY_MODE::PACKETMONITOR) { // when in packet monitor, change channel
                 scan.setChannel(wifi_channel - 1);
-            } else if (mode == DISPLAY_MODE::CLOCK) {         // when in clock, change time
-                setTime(clockHour, clockMinute - 1, clockSecond);
+            } else if (mode == DISPLAY_MODE::CLOCK) {         // when in clock, change value
+                adjustClockValue(-1);
             }
         }
     });
@@ -695,8 +746,8 @@ void DisplayUI::setupButtons() {
                 scan.setChannel(wifi_channel - 1);
             }
 
-            else if (mode == DISPLAY_MODE::CLOCK) {           // when in clock, change time
-                setTime(clockHour, clockMinute - 10, clockSecond);
+            else if (mode == DISPLAY_MODE::CLOCK) {           // when in clock, change value
+                adjustClockValue(-10);
             }
         }
     }, buttonDelay);
@@ -727,10 +778,16 @@ void DisplayUI::setupButtons() {
                     break;
 
                 case DISPLAY_MODE::CLOCK:
+                    if (clockEditField < 2) {
+                        clockEditField++;
+                    } else {
+                        clockEditField = 0;
+                        mode = DISPLAY_MODE::MENU;
+                    }
+                    break;
+
                 case DISPLAY_MODE::CLOCK_DISPLAY:
                     mode = DISPLAY_MODE::MENU;
-                    display.setFont(DejaVu_Sans_Mono_12);
-                    display.setTextAlignment(TEXT_ALIGN_LEFT);
                     break;
             }
         }
@@ -773,9 +830,9 @@ void DisplayUI::setupButtons() {
                     break;
 
                 case DISPLAY_MODE::CLOCK:
+                case DISPLAY_MODE::CLOCK_DISPLAY:
+                    clockEditField = 0;
                     mode = DISPLAY_MODE::MENU;
-                    display.setFont(DejaVu_Sans_Mono_12);
-                    display.setTextAlignment(TEXT_ALIGN_LEFT);
                     break;
             }
         }
@@ -794,19 +851,6 @@ void DisplayUI::draw(bool force) {
         drawTime = currentTime;
 
         updatePrefix();
-
-#ifdef RTC_DS3231
-        bool h12;
-        bool PM_time;
-        clockHour   = clock.getHour(h12, PM_time);
-        clockMinute = clock.getMinute();
-        clockSecond = clock.getSecond();
-#else // ifdef RTC_DS3231
-        if (currentTime - clockTime >= 1000) {
-            setTime(clockHour, clockMinute, ++clockSecond);
-            clockTime += 1000;
-        }
-#endif // ifdef RTC_DS3231
 
         switch (mode) {
             case DISPLAY_MODE::BUTTON_TEST:
@@ -834,9 +878,6 @@ void DisplayUI::draw(bool force) {
                 break;
 
             case DISPLAY_MODE::INTRO:
-                if (!scan.isScanning() && (currentTime - startTime >= screenIntroTime)) {
-                    mode = DISPLAY_MODE::MENU;
-                }
                 drawIntro();
                 break;
             case DISPLAY_MODE::CLOCK:
@@ -1007,6 +1048,196 @@ void DisplayUI::drawAPSTMonitor() {
     drawGraphLine(apMonitorHistory, maxValue, graphTop, graphBottom, false);
 }
 
+void DisplayUI::updateClockRuntime() {
+    bool editingTime      = (mode == DISPLAY_MODE::CLOCK) && (selectedClockItem == CLOCK_ITEM::TIME);
+    bool editingStopwatch = (mode == DISPLAY_MODE::CLOCK) && (selectedClockItem == CLOCK_ITEM::STOPWATCH);
+    bool editingTimer     = (mode == DISPLAY_MODE::CLOCK) && (selectedClockItem == CLOCK_ITEM::TIMER);
+
+#ifdef RTC_DS3231
+    if (!editingTime) {
+        bool h12;
+        bool PM_time;
+        clockHour   = clock.getHour(h12, PM_time);
+        clockMinute = clock.getMinute();
+        clockSecond = clock.getSecond();
+    }
+#else // ifdef RTC_DS3231
+    if (!editingTime) {
+        while (currentTime - clockTime >= 1000) {
+            setTime(clockHour, clockMinute, clockSecond + 1);
+            clockTime += 1000;
+        }
+    } else {
+        clockTime = currentTime;
+    }
+#endif // ifdef RTC_DS3231
+
+    if (stopwatchLastUpdate == 0) stopwatchLastUpdate = currentTime;
+    if (!editingStopwatch) {
+        stopwatchValue += currentTime - stopwatchLastUpdate;
+    }
+    stopwatchLastUpdate = currentTime;
+
+    if (timerLastUpdate == 0) timerLastUpdate = currentTime;
+    if (!editingTimer && (timerValue > 0)) {
+        uint32_t delta = currentTime - timerLastUpdate;
+
+        if (delta >= timerValue) timerValue = 0;
+        else timerValue -= delta;
+    }
+    timerLastUpdate = currentTime;
+}
+
+void DisplayUI::drawClockItem(String title, String value, bool editing) {
+    display.setTextAlignment(TEXT_ALIGN_LEFT);
+    display.setFont(ArialMT_Plain_10);
+    drawString(0, leftRight(title, editing ? str(D_VALUE) : str(D_DISPLAY), maxLen));
+
+    display.setTextAlignment(TEXT_ALIGN_CENTER);
+    display.setFont(ArialMT_Plain_24);
+    display.drawString(screenWidth / 2, 20, value);
+
+    if (editing) {
+        display.setFont(ArialMT_Plain_10);
+        display.drawString(screenWidth / 2, 52, getClockEditFieldLabel());
+    }
+}
+
+String DisplayUI::getClockItemLabel(CLOCK_ITEM item) {
+    switch (item) {
+        case CLOCK_ITEM::TIME:
+            return str(D_TIME);
+
+        case CLOCK_ITEM::STOPWATCH:
+            return str(D_STOPWATCH);
+
+        case CLOCK_ITEM::TIMER:
+            return str(D_TIMER);
+
+        default:
+            return str(D_CLOCK);
+    }
+}
+
+String DisplayUI::getClockDisplayValue(CLOCK_ITEM item, bool compact) {
+    switch (item) {
+        case CLOCK_ITEM::TIME:
+            return formatTimeValue(compact);
+
+        case CLOCK_ITEM::STOPWATCH:
+            return formatDurationValue(stopwatchValue, compact);
+
+        case CLOCK_ITEM::TIMER:
+            return formatDurationValue(timerValue, compact);
+
+        default:
+            return str(D_CLOCK);
+    }
+}
+
+String DisplayUI::getMainClockLabel() {
+    if (mainClockItem == CLOCK_ITEM::NONE) return str(D_CLOCK);
+    return getClockDisplayValue(mainClockItem, true);
+}
+
+String DisplayUI::formatTimeValue(bool compact) {
+    String value = String(clockHour);
+
+    value += ':';
+    value += padTime(clockMinute);
+
+    if (!compact) {
+        value += ':';
+        value += padTime(clockSecond);
+    }
+
+    return value;
+}
+
+String DisplayUI::formatDurationValue(uint32_t value, bool compact) {
+    uint32_t totalSeconds = value / 1000;
+    uint32_t hours        = totalSeconds / 3600;
+    uint32_t minutes      = (totalSeconds / 60) % 60;
+    uint32_t seconds      = totalSeconds % 60;
+
+    if (compact && (hours == 0)) {
+        return String(totalSeconds / 60) + ':' + padTime(seconds);
+    }
+
+    String output = String(hours);
+
+    output += ':';
+    output += padTime(minutes);
+    output += ':';
+    output += padTime(seconds);
+    return output;
+}
+
+String DisplayUI::padTime(int value) {
+    if (value < 10) return String('0') + String(value);
+    return String(value);
+}
+
+String DisplayUI::getClockEditFieldLabel() {
+    switch (clockEditField) {
+        case 0:
+            return String(F("HOUR"));
+
+        case 1:
+            return String(F("MINUTE"));
+
+        default:
+            return String(F("SECOND"));
+    }
+}
+
+void DisplayUI::openClockDisplay(CLOCK_ITEM item) {
+    selectedClockItem = item;
+    clockEditField    = 0;
+    mode              = DISPLAY_MODE::CLOCK_DISPLAY;
+}
+
+void DisplayUI::openClockValueEditor(CLOCK_ITEM item) {
+    selectedClockItem = item;
+    clockEditField    = 0;
+    mode              = DISPLAY_MODE::CLOCK;
+}
+
+void DisplayUI::setMainClockItem(CLOCK_ITEM item) {
+    mainClockItem = item;
+}
+
+void DisplayUI::adjustClockValue(int step) {
+    int fieldStep = step;
+
+    if ((clockEditField == 0) && (fieldStep > 1)) fieldStep = 1;
+    if ((clockEditField == 0) && (fieldStep < -1)) fieldStep = -1;
+
+    if (selectedClockItem == CLOCK_ITEM::TIME) {
+        if (clockEditField == 0) setTime(clockHour + fieldStep, clockMinute, clockSecond);
+        else if (clockEditField == 1) setTime(clockHour, clockMinute + fieldStep, clockSecond);
+        else setTime(clockHour, clockMinute, clockSecond + fieldStep);
+
+        clockTime = currentTime;
+        return;
+    }
+
+    uint32_t amount = (clockEditField == 0) ? 3600000UL : ((clockEditField == 1) ? 60000UL : 1000UL);
+    uint32_t delta  = amount * (uint32_t)abs(fieldStep);
+    uint32_t* value = (selectedClockItem == CLOCK_ITEM::STOPWATCH) ? &stopwatchValue : &timerValue;
+
+    if (fieldStep >= 0) {
+        *value += delta;
+    } else if (*value > delta) {
+        *value -= delta;
+    } else {
+        *value = 0;
+    }
+
+    if (selectedClockItem == CLOCK_ITEM::STOPWATCH) stopwatchLastUpdate = currentTime;
+    else timerLastUpdate = currentTime;
+}
+
 void DisplayUI::drawIntro() {
     drawString(0, center(str(D_INTRO_0), maxLen));
     drawString(1, center(str(D_INTRO_1), maxLen));
@@ -1016,13 +1247,7 @@ void DisplayUI::drawIntro() {
 }
 
 void DisplayUI::drawClock() {
-    String clockTime = String(clockHour);
-
-    clockTime += ':';
-    if (clockMinute < 10) clockTime += '0';
-    clockTime += String(clockMinute);
-
-    display.drawString(64, 20, clockTime);
+    drawClockItem(getClockItemLabel(selectedClockItem), getClockDisplayValue(selectedClockItem, false), mode == DISPLAY_MODE::CLOCK);
 }
 
 void DisplayUI::drawResetting() {
@@ -1100,6 +1325,7 @@ void DisplayUI::handleAutoScanMenuClick() {
         return;
     }
 
+    updateAutoScanMenuContext();
     autoScanMenuActionPending = true;
     autoScanMenuClickTime     = currentTime;
 }
@@ -1107,7 +1333,7 @@ void DisplayUI::handleAutoScanMenuClick() {
 void DisplayUI::updateAutoScanMenuAction() {
     if (!autoScanMenuActionPending) return;
 
-    if (!scan.isAutoScanActive() || (mode != DISPLAY_MODE::MENU) || (currentMenu != &scanMenu) || !isAutoScanMenuSelected()) {
+    if (!scan.isAutoScanActive() || (mode != DISPLAY_MODE::MENU) || !isAutoScanMenuSelected()) {
         cancelAutoScanMenuAction();
         return;
     }
@@ -1121,16 +1347,23 @@ void DisplayUI::updateAutoScanMenuAction() {
 void DisplayUI::cancelAutoScanMenuAction() {
     autoScanMenuActionPending = false;
     autoScanMenuClickTime     = 0;
+    autoScanMenuOwner         = NULL;
+    autoScanMenuIndex         = 0;
 }
 
 bool DisplayUI::isAutoScanMenuSelected() {
-    return currentMenu && (currentMenu == &scanMenu) && (currentMenu->list->size() > 0) &&
-           (currentMenu->selected == currentMenu->list->size() - 1);
+    return currentMenu && autoScanMenuOwner && (currentMenu == autoScanMenuOwner) &&
+           (currentMenu->selected == autoScanMenuIndex);
 }
 
 void DisplayUI::refreshAttackMenu() {
     if (!enabled || (mode != DISPLAY_MODE::MENU) || !currentMenu || (currentMenu != &attackMenu)) return;
     changeMenu(&attackMenu);
+}
+
+void DisplayUI::updateAutoScanMenuContext() {
+    autoScanMenuOwner = currentMenu;
+    autoScanMenuIndex = currentMenu ? currentMenu->selected : 0;
 }
 
 void DisplayUI::resetAPSTMonitorHistory() {

@@ -115,7 +115,6 @@ void setup() {
     // start display
     if (settings::getDisplaySettings().enabled) {
         displayUI.setup();
-        displayUI.mode = DISPLAY_MODE::INTRO;
     }
 
     // load everything else
@@ -149,6 +148,12 @@ void setup() {
 
     // setup reset button
     resetButton = new ButtonPullup(RESET_BUTTON);
+
+    if (settings::getDisplaySettings().enabled) {
+        currentTime = millis();
+        displayUI.showIntro();
+        displayUI.update(true);
+    }
 }
 
 void loop() {
