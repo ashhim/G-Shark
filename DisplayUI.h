@@ -71,6 +71,7 @@ enum class DISPLAY_MODE { OFF,
                           BUTTON_TEST,
                           MENU,
                           LOADSCAN,
+                          AUTOSCAN_VIEW,
                           PACKETMONITOR,
                           INTRO,
                           CLOCK,
@@ -132,15 +133,18 @@ class DisplayUI {
 
     private:
         int16_t selectedID    = 0; // i.e. access point ID to draw the apMenu
+        int16_t autoScanRow   = 0;
         uint8_t scrollCounter = 0; // for horizontal scrolling
 
         uint32_t scrollTime = 0;   // last time a character was moved
         uint32_t drawTime   = 0;   // last time a frame was drawn
         uint32_t startTime  = 0;   // when the screen was enabled
         uint32_t buttonTime = 0;   // last time a button was pressed
+        uint32_t autoScanMenuClickTime = 0;
 
         bool enabled = false;      // display enabled
         bool tempOff = false;
+        bool autoScanMenuActionPending = false;
 
         // selected attack modes
         bool beaconSelected = false;
@@ -179,6 +183,7 @@ class DisplayUI {
         void drawButtonTest();
         void drawMenu();
         void drawLoadingScan();
+        void drawAutoScanView();
         void drawPacketMonitor();
         void drawIntro();
         void drawResetting();
@@ -188,6 +193,12 @@ class DisplayUI {
         void changeMenu(Menu* menu);
         void goBack();
         void createMenu(Menu* menu, Menu* parent, std::function<void()>build);
+        void openAutoScanView();
+        void closeAutoScanView();
+        void handleAutoScanMenuClick();
+        void updateAutoScanMenuAction();
+        void cancelAutoScanMenuAction();
+        bool isAutoScanMenuSelected();
 
         void addMenuNode(Menu* menu, std::function<String()>getStr, std::function<void()>click, std::function<void()>hold);
         void addMenuNode(Menu* menu, std::function<String()>getStr, std::function<void()>click);

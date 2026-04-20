@@ -19,6 +19,7 @@
 #define SCAN_DEFAULT_TIME 15000
 #define SCAN_DEFAULT_CONTINUE_TIME 10000
 #define SCAN_PACKET_LIST_SIZE 64
+#define AUTOSCAN_AP_TIMEOUT 60000
 
 extern Accesspoints accesspoints;
 extern Stations     stations;

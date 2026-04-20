@@ -25,6 +25,8 @@ bool Accesspoints::readScanAP(AP& ap, uint8_t id, bool selected) {
 
     memcpy(ap.mac, bssid, 6);
     ap.selected = selected;
+    ap.autoScan = false;
+    ap.lastSeen = currentTime;
     return true;
 }
 
@@ -53,13 +55,15 @@ void Accesspoints::sortAfterChannel() {
 }
 
 void Accesspoints::add(uint8_t id, bool selected) {
-    addOrUpdate(id, selected);
+    addOrUpdate(id, selected, false);
 }
 
-void Accesspoints::addOrUpdate(uint8_t id, bool selected) {
+bool Accesspoints::addOrUpdate(uint8_t id, bool selected, bool autoScan) {
     AP ap;
 
-    if (!readScanAP(ap, id, selected)) return;
+    if (!readScanAP(ap, id, selected)) return false;
+
+    ap.autoScan = autoScan;
 
     int existing = find(ap.mac);
 
@@ -69,20 +73,58 @@ void Accesspoints::addOrUpdate(uint8_t id, bool selected) {
         ap.id       = current.id;
         ap.selected = current.selected || selected;
 
+        if (current.autoScan || autoScan) {
+            ap.autoScan = true;
+            ap.lastSeen = currentTime;
+        } else {
+            ap.autoScan = false;
+            ap.lastSeen = current.lastSeen;
+        }
+
         bool updated = (current.selected != ap.selected) || (current.hidden != ap.hidden) || (current.ch != ap.ch) ||
                        (current.rssi != ap.rssi) || (current.enc != ap.enc) || (current.ssid != ap.ssid) ||
-                       (memcmp(current.mac, ap.mac, 6) != 0);
+                       (current.autoScan != ap.autoScan) || (memcmp(current.mac, ap.mac, 6) != 0);
 
-        if (updated) {
-            list->replace(existing, ap);
-            changed = true;
-        }
-        return;
+        list->replace(existing, ap);
+
+        if (updated) changed = true;
+        return false;
     }
 
     ap.id = nextID++;
     list->add(ap);
     changed = true;
+    return true;
+}
+
+void Accesspoints::prepareAutoScan() {
+    for (int i = 0; i < count(); i++) {
+        AP ap = list->get(i);
+        bool updated = !ap.selected || !ap.autoScan;
+
+        ap.selected = true;
+        ap.autoScan = true;
+        ap.lastSeen = currentTime;
+        list->replace(i, ap);
+
+        if (updated) changed = true;
+    }
+}
+
+bool Accesspoints::removeExpiredAutoScan(uint32_t timeout) {
+    bool removed = false;
+
+    for (int i = count() - 1; i >= 0; i--) {
+        AP ap = list->get(i);
+
+        if (ap.autoScan && (currentTime - ap.lastSeen >= timeout)) {
+            internal_remove(i);
+            removed = true;
+        }
+    }
+
+    if (removed) changed = true;
+    return removed;
 }
 
 void Accesspoints::printAll() {

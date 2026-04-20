@@ -12,6 +12,7 @@ extern "C" {
 #include "Names.h"
 
 extern Names names;
+extern uint32_t currentTime;
 
 extern String searchVendor(uint8_t* mac);
 extern String leftRight(String a, String b, int len);
@@ -27,6 +28,8 @@ struct AP {
     uint8_t mac[6];
     bool    hidden;
     bool    selected;
+    bool    autoScan;
+    uint32_t lastSeen;
 };
 
 class Accesspoints {
@@ -37,7 +40,9 @@ class Accesspoints {
         void sortAfterChannel();
 
         void add(uint8_t id, bool selected);
-        void addOrUpdate(uint8_t id, bool selected);
+        bool addOrUpdate(uint8_t id, bool selected, bool autoScan = false);
+        void prepareAutoScan();
+        bool removeExpiredAutoScan(uint32_t timeout);
 
         void print(int num);
         void print(int num, bool header, bool footer);

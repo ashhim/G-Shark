@@ -59,6 +59,8 @@ void Scan::start(uint8_t mode) {
 
 void Scan::start(uint8_t mode, uint32_t time, uint8_t nextmode, uint32_t continueTime, bool channelHop,
                  uint8_t channel) {
+    bool wasAutoScanActive = isAutoScanActive();
+
     if (mode != SCAN_MODE_OFF) stop();
 
     setWifiChannel(channel, true);
@@ -82,6 +84,9 @@ void Scan::start(uint8_t mode, uint32_t time, uint8_t nextmode, uint32_t continu
         if (mode != SCAN_MODE_AUTOSCAN) {
             accesspoints.removeAll();
             stations.removeAll();
+        } else if (!wasAutoScanActive) {
+            accesspoints.prepareAutoScan();
+            ssids.syncSelectedAPs();
         }
         // start AP scan
         prntln(SC_START_AP);
@@ -153,11 +158,18 @@ void Scan::start(uint8_t mode, uint32_t time, uint8_t nextmode, uint32_t continu
 }
 
 void Scan::update() {
+    bool syncClones = false;
+
+    if (isAutoScanActive() && accesspoints.removeExpiredAutoScan(AUTOSCAN_AP_TIMEOUT)) {
+        syncClones = true;
+    }
+
     if (scanMode == SCAN_MODE_OFF) {
         // restart scan if it is continuous
         if (scan_continue_mode != SCAN_MODE_OFF) {
             if (currentTime - continueStartTime > continueTime) start(scan_continue_mode);
         }
+        if (syncClones) ssids.syncSelectedAPs();
         return;
     }
 
@@ -201,11 +213,23 @@ void Scan::update() {
         int16_t results = WiFi.scanComplete();
 
         if (results >= 0) {
+            bool autoScanAdded = false;
+
             for (int16_t i = 0; i < results && i < 256; i++) {
-                if (channelHop || (WiFi.channel(i) == wifi_channel)) accesspoints.addOrUpdate(i, scanMode == SCAN_MODE_AUTOSCAN);
+                if (channelHop || (WiFi.channel(i) == wifi_channel)) {
+                    if (accesspoints.addOrUpdate(i, scanMode == SCAN_MODE_AUTOSCAN, scanMode == SCAN_MODE_AUTOSCAN)) {
+                        autoScanAdded = autoScanAdded || (scanMode == SCAN_MODE_AUTOSCAN);
+                    }
+                }
             }
             if (scanMode != SCAN_MODE_AUTOSCAN) accesspoints.sort();
             accesspoints.printAll();
+            if (autoScanAdded) syncClones = true;
+
+            if (syncClones && scanMode == SCAN_MODE_AUTOSCAN) {
+                ssids.syncSelectedAPs();
+                syncClones = false;
+            }
 
             if (scanMode == SCAN_MODE_ALL) {
                 delay(30);
@@ -228,6 +252,8 @@ void Scan::update() {
         }
         start(SCAN_MODE_OFF);
     }
+
+    if (syncClones) ssids.syncSelectedAPs();
 }
 
 void Scan::setup() {

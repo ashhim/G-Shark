@@ -169,12 +169,31 @@ void DisplayUI::setup() {
         int c = accesspoints.count();
 
         for (int i = 0; i < c; i++) {
-            addMenuNode(&apListMenu, [i]() {
-                return b2a(accesspoints.getSelected(i)) + accesspoints.getSSID(i);
-            }, [this, i]() {
-                accesspoints.getSelected(i) ? accesspoints.deselect(i) : accesspoints.select(i);
-            }, [this, i]() {
-                selectedID = i;
+            uint16_t apID = accesspoints.getID(i);
+
+            addMenuNode(&apListMenu, [apID]() -> String {
+                int apIndex = accesspoints.find(apID);
+
+                if (apIndex < 0) return String(F("REMOVED"));
+                return String(b2a(accesspoints.getSelected(apIndex))) + accesspoints.getSSID(apIndex);
+            }, [this, apID]() {
+                int apIndex = accesspoints.find(apID);
+
+                if (apIndex < 0) {
+                    changeMenu(&apListMenu);
+                    return;
+                }
+
+                accesspoints.getSelected(apIndex) ? accesspoints.deselect(apIndex) : accesspoints.select(apIndex);
+            }, [this, apID]() {
+                int apIndex = accesspoints.find(apID);
+
+                if (apIndex < 0) {
+                    changeMenu(&apListMenu);
+                    return;
+                }
+
+                selectedID = apIndex;
                 changeMenu(&apMenu);
             });
         }
@@ -979,9 +998,7 @@ void DisplayUI::clearMenu(Menu* menu) {
 void DisplayUI::changeMenu(Menu* menu) {
     if (menu) {
         // only open list menu if it has nodes
-        if (((menu == &apListMenu) && (accesspoints.count() == 0)) ||
-            ((menu == &stationListMenu) && (stations.count() == 0)) ||
-            ((menu == &nameListMenu) && (names.count() == 0))) {
+        if (((menu == &apListMenu) && (accesspoints.count() == 0))) {
             return;
         }
 

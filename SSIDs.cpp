@@ -225,6 +225,33 @@ void SSIDs::cloneSelected(bool force) {
     }
 }
 
+void SSIDs::syncSelectedAPs() {
+    internal_removeAll();
+
+    int selectedCount = accesspoints.selected();
+
+    if (selectedCount > 0) {
+        int clones = SSID_LIST_SIZE / selectedCount;
+        int apCount = accesspoints.count();
+
+        for (int i = 0; i < apCount; i++) {
+            if (!accesspoints.getSelected(i)) continue;
+
+            String name = accesspoints.getSSID(i);
+            bool wpa2 = accesspoints.getEnc(i) != 0;
+
+            for (int j = 0; j < clones; j++) {
+                internal_add(clones > 1 ? randomize(name) : name, wpa2, name.length());
+
+                if (list->size() > SSID_LIST_SIZE) internal_remove(0);
+            }
+        }
+    }
+
+    changed = true;
+    save(false);
+}
+
 bool SSIDs::getRandom() {
     return randomMode;
 }
