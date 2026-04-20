@@ -610,7 +610,7 @@
 
 // ======== CONSTANTS ========== //
 // Do not change these values unless you know what you're doing!
-#define DEAUTHER_VERSION "G-Shark 2.4"
+#define DEAUTHER_VERSION "G-Shark 2.6"
 #define DEAUTHER_VERSION_MAJOR 2
 #define DEAUTHER_VERSION_MINOR 6
 #define DEAUTHER_VERSION_REVISION 1

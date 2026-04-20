@@ -6,7 +6,9 @@
 #include "wifi.h"
 
 Scan::Scan() {
-    list = new SimpleList<uint16_t>;
+    list                = new SimpleList<uint16_t>;
+    monitorAccesspoints = new SimpleList<MonitorDevice>;
+    monitorStations     = new SimpleList<MonitorDevice>;
 }
 
 void Scan::sniffer(uint8_t* buf, uint16_t len) {
@@ -32,6 +34,15 @@ void Scan::sniffer(uint8_t* buf, uint16_t len) {
 
     if (macBroadcast(macTo) || macBroadcast(macFrom) || !macValid(macTo) || !macValid(macFrom) || macMulticast(macTo) ||
         macMulticast(macFrom)) return;
+
+    if (isAPSTMonitorStationScan()) {
+        if (findMonitorDevice(monitorAccesspoints, macFrom) >= 0) {
+            updateMonitorStation(macTo);
+        } else if (findMonitorDevice(monitorAccesspoints, macTo) >= 0) {
+            updateMonitorStation(macFrom);
+        }
+        return;
+    }
 
     int accesspointNum = findAccesspoint(macFrom);
 
@@ -59,7 +70,8 @@ void Scan::start(uint8_t mode) {
 
 void Scan::start(uint8_t mode, uint32_t time, uint8_t nextmode, uint32_t continueTime, bool channelHop,
                  uint8_t channel) {
-    bool wasAutoScanActive = isAutoScanActive();
+    bool wasAutoScanActive    = isAutoScanActive();
+    bool wasAPSTMonitorActive = isAPSTMonitorActive();
 
     if (mode != SCAN_MODE_OFF) stop();
 
@@ -93,10 +105,17 @@ void Scan::start(uint8_t mode, uint32_t time, uint8_t nextmode, uint32_t continu
         WiFi.scanNetworks(true, true);
     }
 
+    else if (mode == SCAN_MODE_APST_MONITOR) {
+        if (!wasAPSTMonitorActive) resetAPSTMonitor();
+
+        prntln(SC_START_AP);
+        WiFi.scanNetworks(true, true);
+    }
+
     /* Station Scan */
     else if (mode == SCAN_MODE_STATIONS) {
         // start station scan
-        if (accesspoints.count() < 1) {
+        if (!isAPSTMonitorActive() && (accesspoints.count() < 1)) {
             start(SCAN_MODE_ALL);
             // Serial.println(str(SC_ERROR_NO_AP));
             return;
@@ -164,6 +183,11 @@ void Scan::update() {
         syncClones = true;
     }
 
+    if (isAPSTMonitorActive()) {
+        pruneMonitorDevices(monitorAccesspoints, APST_MONITOR_AP_TIMEOUT);
+        pruneMonitorDevices(monitorStations, APST_MONITOR_STATION_TIMEOUT);
+    }
+
     if (scanMode == SCAN_MODE_OFF) {
         // restart scan if it is continuous
         if (scan_continue_mode != SCAN_MODE_OFF) {
@@ -189,11 +213,12 @@ void Scan::update() {
         // print status every 3s
         if (currentTime - snifferOutputTime > 3000) {
             char s[100];
+            uint16_t stationCount = isAPSTMonitorStationScan() ? getMonitorStationCount() : stations.count();
 
             if (sniffTime > 0) {
-                sprintf(s, str(SC_OUTPUT_A).c_str(), getPercentage(), packets, stations.count(), deauths);
+                sprintf(s, str(SC_OUTPUT_A).c_str(), getPercentage(), packets, stationCount, deauths);
             } else {
-                sprintf(s, str(SC_OUTPUT_B).c_str(), packets, stations.count(), deauths);
+                sprintf(s, str(SC_OUTPUT_B).c_str(), packets, stationCount, deauths);
             }
             prnt(String(s));
             snifferOutputTime = currentTime;
@@ -203,8 +228,8 @@ void Scan::update() {
         if (channelHop && (currentTime - snifferChannelTime > settings::getSnifferSettings().channel_time)) {
             snifferChannelTime = currentTime;
 
-            if (scanMode == SCAN_MODE_STATIONS) nextChannel();  // go to next channel an AP is on
-            else setChannel(wifi_channel + 1);                  // go to next channel
+            if ((scanMode == SCAN_MODE_STATIONS) && !isAPSTMonitorStationScan()) nextChannel();
+            else setChannel(wifi_channel + 1);
         }
     }
 
@@ -242,11 +267,27 @@ void Scan::update() {
         }
     }
 
+    else if (scanMode == SCAN_MODE_APST_MONITOR) {
+        int16_t results = WiFi.scanComplete();
+
+        if (results >= 0) {
+            for (int16_t i = 0; i < results && i < 256; i++) {
+                if (!channelHop && (WiFi.channel(i) != wifi_channel)) continue;
+
+                uint8_t* bssid = WiFi.BSSID(i);
+
+                if (bssid) updateMonitorAccesspoint(bssid, WiFi.channel(i));
+            }
+
+            start(SCAN_MODE_STATIONS, APST_MONITOR_STATION_TIME, SCAN_MODE_APST_MONITOR, 0, true, wifi_channel);
+        }
+    }
+
     // Stations
     else if ((sniffTime > 0) && (currentTime > snifferStartTime + sniffTime)) {
         wifi_promiscuous_enable(false);
 
-        if (scanMode == SCAN_MODE_STATIONS) {
+        if ((scanMode == SCAN_MODE_STATIONS) && !isAPSTMonitorStationScan()) {
             stations.sort();
             stations.printAll();
         }
@@ -409,6 +450,10 @@ bool Scan::isAutoScanActive() {
     return scanMode == SCAN_MODE_AUTOSCAN || scan_continue_mode == SCAN_MODE_AUTOSCAN;
 }
 
+bool Scan::isAPSTMonitorActive() {
+    return scanMode == SCAN_MODE_APST_MONITOR || scan_continue_mode == SCAN_MODE_APST_MONITOR;
+}
+
 uint8_t Scan::getPercentage() {
     if (!isSniffing()) return 0;
 
@@ -472,6 +517,9 @@ String Scan::getMode() {
         case SCAN_MODE_AUTOSCAN:
             return str(D_AUTOSCAN);
 
+        case SCAN_MODE_APST_MONITOR:
+            return str(D_APST_MONITOR);
+
         default:
             return String();
     }
@@ -492,4 +540,83 @@ uint32_t Scan::getMaxPacket() {
 
 uint32_t Scan::getPacketRate() {
     return list->get(list->size() - 1);
+}
+
+uint16_t Scan::getMonitorAccesspointCount() {
+    return monitorAccesspoints->size();
+}
+
+uint16_t Scan::getMonitorStationCount() {
+    return monitorStations->size();
+}
+
+bool Scan::isAPSTMonitorStationScan() {
+    return (scanMode == SCAN_MODE_STATIONS) && (scan_continue_mode == SCAN_MODE_APST_MONITOR);
+}
+
+int Scan::findMonitorDevice(SimpleList<MonitorDevice>* deviceList, uint8_t* mac) {
+    if (!mac) return -1;
+
+    for (int i = 0; i < deviceList->size(); i++) {
+        if (memcmp(deviceList->get(i).mac, mac, 6) == 0) return i;
+    }
+
+    return -1;
+}
+
+void Scan::resetAPSTMonitor() {
+    monitorAccesspoints->clear();
+    monitorStations->clear();
+}
+
+void Scan::updateMonitorAccesspoint(uint8_t* mac, uint8_t ch) {
+    updateMonitorDevice(monitorAccesspoints, mac, ch, APST_MONITOR_AP_LIST_SIZE);
+}
+
+void Scan::updateMonitorStation(uint8_t* mac) {
+    updateMonitorDevice(monitorStations, mac, wifi_channel, APST_MONITOR_STATION_LIST_SIZE);
+}
+
+void Scan::updateMonitorDevice(SimpleList<MonitorDevice>* deviceList, uint8_t* mac, uint8_t ch, uint16_t maxSize) {
+    int existing = findMonitorDevice(deviceList, mac);
+
+    if (existing >= 0) {
+        MonitorDevice device = deviceList->get(existing);
+
+        device.ch       = ch;
+        device.lastSeen = currentTime;
+        deviceList->replace(existing, device);
+        return;
+    }
+
+    if (deviceList->size() >= maxSize) {
+        int oldest = findOldestMonitorDevice(deviceList);
+
+        if (oldest >= 0) deviceList->remove(oldest);
+    }
+
+    MonitorDevice device;
+
+    memcpy(device.mac, mac, 6);
+    device.ch       = ch;
+    device.lastSeen = currentTime;
+    deviceList->add(device);
+}
+
+void Scan::pruneMonitorDevices(SimpleList<MonitorDevice>* deviceList, uint32_t timeout) {
+    for (int i = deviceList->size() - 1; i >= 0; i--) {
+        if (currentTime - deviceList->get(i).lastSeen >= timeout) deviceList->remove(i);
+    }
+}
+
+int Scan::findOldestMonitorDevice(SimpleList<MonitorDevice>* deviceList) {
+    if (deviceList->size() <= 0) return -1;
+
+    int oldest = 0;
+
+    for (int i = 1; i < deviceList->size(); i++) {
+        if (deviceList->get(i).lastSeen < deviceList->get(oldest).lastSeen) oldest = i;
+    }
+
+    return oldest;
 }

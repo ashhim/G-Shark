@@ -16,10 +16,16 @@
 #define SCAN_MODE_ALL 3
 #define SCAN_MODE_SNIFFER 4
 #define SCAN_MODE_AUTOSCAN 5
+#define SCAN_MODE_APST_MONITOR 6
 #define SCAN_DEFAULT_TIME 15000
 #define SCAN_DEFAULT_CONTINUE_TIME 10000
 #define SCAN_PACKET_LIST_SIZE 64
 #define AUTOSCAN_AP_TIMEOUT 60000
+#define APST_MONITOR_AP_TIMEOUT 15000
+#define APST_MONITOR_STATION_TIMEOUT 15000
+#define APST_MONITOR_STATION_TIME 5000
+#define APST_MONITOR_AP_LIST_SIZE 128
+#define APST_MONITOR_STATION_LIST_SIZE 128
 
 extern Accesspoints accesspoints;
 extern Stations     stations;
@@ -61,6 +67,7 @@ class Scan {
         bool isSniffing();
         bool isContinuous();
         bool isAutoScanActive();
+        bool isAPSTMonitorActive();
 
         void nextChannel();
         void setChannel(uint8_t newChannel);
@@ -69,12 +76,23 @@ class Scan {
         double getScaleFactor(uint8_t height);
         uint32_t getMaxPacket();
         uint32_t getPacketRate();
+        uint16_t getMonitorAccesspointCount();
+        uint16_t getMonitorStationCount();
 
         uint16_t deauths = 0;
         uint16_t packets = 0;
 
     private:
         SimpleList<uint16_t>* list;                      // packet list
+
+        struct MonitorDevice {
+            uint8_t  mac[6];
+            uint8_t  ch;
+            uint32_t lastSeen;
+        };
+
+        SimpleList<MonitorDevice>* monitorAccesspoints;
+        SimpleList<MonitorDevice>* monitorStations;
 
         uint32_t sniffTime          = SCAN_DEFAULT_TIME; // how long the scan runs
         uint32_t snifferStartTime   = 0;                 // when the scan started
@@ -93,6 +111,14 @@ class Scan {
 
         bool apWithChannel(uint8_t ch);
         int findAccesspoint(uint8_t* mac);
+        bool isAPSTMonitorStationScan();
+        int findMonitorDevice(SimpleList<MonitorDevice>* deviceList, uint8_t* mac);
+        void resetAPSTMonitor();
+        void updateMonitorAccesspoint(uint8_t* mac, uint8_t ch);
+        void updateMonitorStation(uint8_t* mac);
+        void updateMonitorDevice(SimpleList<MonitorDevice>* deviceList, uint8_t* mac, uint8_t ch, uint16_t maxSize);
+        void pruneMonitorDevices(SimpleList<MonitorDevice>* deviceList, uint32_t timeout);
+        int findOldestMonitorDevice(SimpleList<MonitorDevice>* deviceList);
 
         String FILE_PATH = "/scan.json";
 };

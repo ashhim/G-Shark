@@ -103,6 +103,9 @@ void DisplayUI::setup() {
             scan.start(SCAN_MODE_SNIFFER, 0, SCAN_MODE_OFF, 0, false, wifi_channel);
             mode = DISPLAY_MODE::PACKETMONITOR;
         });
+        addMenuNode(&mainMenu, D_APST_MONITOR, [this]() {   // APST MONITOR
+            startAPSTMonitor();
+        });
         addMenuNode(&mainMenu, D_CLOCK, &clockMenu); // CLOCK
 
 #ifdef HIGHLIGHT_LED
@@ -493,6 +496,13 @@ void DisplayUI::setup() {
 
             if (attack.isRunning()) restartAttack();
         });
+        addMenuNode(&attackMenu, [this]() { // AUTOSCAN
+            return leftRight(scan.isAutoScanActive() ? str(D_SCANNING) : str(D_AUTOSCAN),
+                             String(accesspoints.count()), maxLen - 1);
+        }, [this]() {
+            if (!scan.isAutoScanActive()) startAutoScan();
+            openAutoScanView();
+        });
         addMenuNode(&attackMenu, [this]() { // *NAMEME
             return leftRight(b2a(namemeSelected) + str(D_NAMEME), (String)accesspoints.selected(), maxLen - 1);
         }, [this, restartAttack]() { // nameme
@@ -710,8 +720,9 @@ void DisplayUI::setupButtons() {
                     break;
 
                 case DISPLAY_MODE::PACKETMONITOR:
+                case DISPLAY_MODE::APSTMONITOR:
                 case DISPLAY_MODE::LOADSCAN:
-                    if (mode == DISPLAY_MODE::PACKETMONITOR || !scan.isAutoScanActive()) scan.stop();
+                    if ((mode == DISPLAY_MODE::PACKETMONITOR) || (mode == DISPLAY_MODE::APSTMONITOR) || !scan.isAutoScanActive()) scan.stop();
                     mode = DISPLAY_MODE::MENU;
                     break;
 
@@ -755,8 +766,9 @@ void DisplayUI::setupButtons() {
                     break;
 
                 case DISPLAY_MODE::PACKETMONITOR:
+                case DISPLAY_MODE::APSTMONITOR:
                 case DISPLAY_MODE::LOADSCAN:
-                    if (mode == DISPLAY_MODE::PACKETMONITOR || !scan.isAutoScanActive()) scan.stop();
+                    if ((mode == DISPLAY_MODE::PACKETMONITOR) || (mode == DISPLAY_MODE::APSTMONITOR) || !scan.isAutoScanActive()) scan.stop();
                     mode = DISPLAY_MODE::MENU;
                     break;
 
@@ -817,6 +829,10 @@ void DisplayUI::draw(bool force) {
                 drawPacketMonitor();
                 break;
 
+            case DISPLAY_MODE::APSTMONITOR:
+                drawAPSTMonitor();
+                break;
+
             case DISPLAY_MODE::INTRO:
                 if (!scan.isScanning() && (currentTime - startTime >= screenIntroTime)) {
                     mode = DISPLAY_MODE::MENU;
@@ -844,7 +860,7 @@ void DisplayUI::drawButtonTest() {
 }
 
 void DisplayUI::drawMenu() {
-    bool compactMenu = (currentMenu == &showMenu) || (currentMenu == &namemeListMenu);
+    bool compactMenu = (currentMenu == &mainMenu) || (currentMenu == &showMenu) || (currentMenu == &namemeListMenu);
     int  rowsPerPage = compactMenu ? 6 : 5;
     int  rowHeight   = compactMenu ? 10 : 12;
 
@@ -967,6 +983,30 @@ void DisplayUI::drawPacketMonitor() {
     }
 }
 
+void DisplayUI::drawAPSTMonitor() {
+    display.setFont(ArialMT_Plain_10);
+    updateAPSTMonitorHistory();
+
+    String headline = leftRight(String(F("AP [")) + String(scan.getMonitorAccesspointCount()) + ']',
+                                String(F("ST [")) + String(scan.getMonitorStationCount()) + ']',
+                                maxLen);
+
+    drawString(0, 0, headline);
+
+    uint16_t maxValue = 1;
+
+    for (uint8_t i = 0; i < SCAN_PACKET_LIST_SIZE; i++) {
+        if (apMonitorHistory[i] > maxValue) maxValue = apMonitorHistory[i];
+        if (stMonitorHistory[i] > maxValue) maxValue = stMonitorHistory[i];
+    }
+
+    int graphTop    = lineHeight + 2;
+    int graphBottom = sreenHeight - 1;
+
+    drawGraphLine(stMonitorHistory, maxValue, graphTop, graphBottom, true);
+    drawGraphLine(apMonitorHistory, maxValue, graphTop, graphBottom, false);
+}
+
 void DisplayUI::drawIntro() {
     drawString(0, center(str(D_INTRO_0), maxLen));
     drawString(1, center(str(D_INTRO_1), maxLen));
@@ -1035,10 +1075,20 @@ void DisplayUI::closeAutoScanView() {
     mode          = DISPLAY_MODE::MENU;
 }
 
+void DisplayUI::startAutoScan() {
+    cancelAutoScanMenuAction();
+    scan.start(SCAN_MODE_AUTOSCAN, 0, SCAN_MODE_AUTOSCAN, 0, true, wifi_channel);
+}
+
+void DisplayUI::startAPSTMonitor() {
+    resetAPSTMonitorHistory();
+    scan.start(SCAN_MODE_APST_MONITOR, 0, SCAN_MODE_APST_MONITOR, 0, true, wifi_channel);
+    mode = DISPLAY_MODE::APSTMONITOR;
+}
+
 void DisplayUI::handleAutoScanMenuClick() {
     if (!scan.isAutoScanActive()) {
-        cancelAutoScanMenuAction();
-        scan.start(SCAN_MODE_AUTOSCAN, 0, SCAN_MODE_AUTOSCAN, 0, true, wifi_channel);
+        startAutoScan();
         openAutoScanView();
         return;
     }
@@ -1081,6 +1131,86 @@ bool DisplayUI::isAutoScanMenuSelected() {
 void DisplayUI::refreshAttackMenu() {
     if (!enabled || (mode != DISPLAY_MODE::MENU) || !currentMenu || (currentMenu != &attackMenu)) return;
     changeMenu(&attackMenu);
+}
+
+void DisplayUI::resetAPSTMonitorHistory() {
+    for (uint8_t i = 0; i < SCAN_PACKET_LIST_SIZE; i++) {
+        apMonitorHistory[i] = 0;
+        stMonitorHistory[i] = 0;
+    }
+
+    apstMonitorSampleTime = currentTime;
+}
+
+void DisplayUI::updateAPSTMonitorHistory() {
+    const uint16_t sampleInterval = 500;
+
+    if (apstMonitorSampleTime == 0) apstMonitorSampleTime = currentTime;
+
+    while (currentTime - apstMonitorSampleTime >= sampleInterval) {
+        for (uint8_t i = 0; i < SCAN_PACKET_LIST_SIZE - 1; i++) {
+            apMonitorHistory[i] = apMonitorHistory[i + 1];
+            stMonitorHistory[i] = stMonitorHistory[i + 1];
+        }
+
+        apMonitorHistory[SCAN_PACKET_LIST_SIZE - 1] = scan.getMonitorAccesspointCount();
+        stMonitorHistory[SCAN_PACKET_LIST_SIZE - 1] = scan.getMonitorStationCount();
+        apstMonitorSampleTime += sampleInterval;
+    }
+}
+
+void DisplayUI::drawGraphLine(uint16_t* values, uint16_t maxValue, int graphTop, int graphBottom, bool dotted) {
+    int prevX = 0;
+    int prevY = getGraphY(values[0], maxValue, graphTop, graphBottom);
+
+    for (uint8_t i = 1; i < SCAN_PACKET_LIST_SIZE; i++) {
+        int x = i * 2;
+        int y = getGraphY(values[i], maxValue, graphTop, graphBottom);
+
+        if (dotted) drawDottedLine(prevX, prevY, x, y);
+        else drawLine(prevX, prevY, x, y);
+
+        prevX = x;
+        prevY = y;
+    }
+}
+
+void DisplayUI::drawDottedLine(int x0, int y0, int x1, int y1) {
+    int dx  = abs(x1 - x0);
+    int sx  = x0 < x1 ? 1 : -1;
+    int dy  = -abs(y1 - y0);
+    int sy  = y0 < y1 ? 1 : -1;
+    int err = dx + dy;
+    int i   = 0;
+
+    while (true) {
+        if ((i & 1) == 0) display.setPixel(x0, y0);
+        if ((x0 == x1) && (y0 == y1)) break;
+
+        int e2 = err * 2;
+
+        if (e2 >= dy) {
+            err += dy;
+            x0  += sx;
+        }
+
+        if (e2 <= dx) {
+            err += dx;
+            y0  += sy;
+        }
+
+        i++;
+    }
+}
+
+int DisplayUI::getGraphY(uint16_t value, uint16_t maxValue, int graphTop, int graphBottom) {
+    if (maxValue == 0) return graphBottom;
+
+    int graphHeight = graphBottom - graphTop;
+
+    if (graphHeight <= 0) return graphBottom;
+
+    return graphBottom - ((int)value * graphHeight / (int)maxValue);
 }
 
 void DisplayUI::createMenu(Menu* menu, Menu* parent, std::function<void()>build) {
