@@ -75,6 +75,8 @@ enum class DISPLAY_MODE { OFF,
                           PACKETMONITOR,
                           APSTMONITOR,
                           APTRACKER,
+                          APSTTRACKER,
+                          APSTTRACKER_STATIONS,
                           INTRO,
                           CLOCK,
                           CLOCK_DISPLAY,
@@ -143,6 +145,8 @@ class DisplayUI {
         int16_t selectedID      = 0; // i.e. access point ID to draw the apMenu
         int16_t autoScanRow     = 0;
         int16_t trackerRow      = 0;
+        int16_t apstTrackerRow  = 0;
+        int16_t apstTrackerStationRow = 0;
         uint8_t scrollCounter   = 0; // for horizontal scrolling
         uint16_t apMonitorHistory[SCAN_PACKET_LIST_SIZE] = { 0 };
         uint16_t stMonitorHistory[SCAN_PACKET_LIST_SIZE] = { 0 };
@@ -158,11 +162,13 @@ class DisplayUI {
         uint32_t timerValue             = 0;
         uint32_t timerLastUpdate        = 0;
         uint32_t apTrackerStopClickTime = 0;
+        uint32_t apstTrackerStopClickTime = 0;
 
         bool enabled                   = false; // display enabled
         bool tempOff                   = false;
         bool autoScanMenuActionPending = false;
         bool apTrackerStopPending      = false;
+        bool apstTrackerStopPending    = false;
 
         // selected attack modes
         bool beaconSelected = false;
@@ -200,6 +206,7 @@ class DisplayUI {
         CLOCK_ITEM selectedClockItem  = CLOCK_ITEM::TIME;
         CLOCK_ITEM mainClockItem      = CLOCK_ITEM::NONE;
         uint8_t clockEditField        = 0;
+        uint16_t apstTrackerStationApId = 0xFFFF;
 
         void setupButtons();
 
@@ -214,6 +221,8 @@ class DisplayUI {
         void drawPacketMonitor();
         void drawAPSTMonitor();
         void drawAPTracker();
+        void drawAPSTTracker();
+        void drawAPSTTrackerStations();
         void drawIntro();
         void drawResetting();
         void clearMenu(Menu* menu);
@@ -222,6 +231,7 @@ class DisplayUI {
         void drawGraphLine(uint16_t* values, uint16_t maxValue, int graphTop, int graphBottom, bool dotted);
         void drawDottedLine(int x0, int y0, int x1, int y1);
         void drawTrackerArrow(int x, int y, int8_t trend);
+        String getTrackerWindow(String value, bool selected, int visibleChars, uint16_t holdTime, uint16_t stepTime);
         int getGraphY(uint16_t value, uint16_t maxValue, int graphTop, int graphBottom);
         void updateClockRuntime();
         void drawClockItem(String title, String value, bool editing);
@@ -250,9 +260,14 @@ class DisplayUI {
         void startAutoScan();
         void startAPSTMonitor();
         void startAPTracker();
+        void startAPSTTracker();
+        void openAPSTTrackerStations();
         void handleAutoScanMenuClick();
         void updateAutoScanMenuAction();
         void cancelAutoScanMenuAction();
+        void cancelAPSTTrackerStopAction();
+        void handleAPSTTrackerStopClick();
+        void updateAPSTTrackerStopAction();
         bool isAutoScanMenuSelected();
 
         void addMenuNode(Menu* menu, std::function<String()>getStr, std::function<void()>click, std::function<void()>hold);

@@ -18,6 +18,7 @@
 #define SCAN_MODE_AUTOSCAN 5
 #define SCAN_MODE_APST_MONITOR 6
 #define SCAN_MODE_AP_TRACKER 7
+#define SCAN_MODE_APST_TRACKER 8
 #define SCAN_DEFAULT_TIME 15000
 #define SCAN_DEFAULT_CONTINUE_TIME 10000
 #define SCAN_PACKET_LIST_SIZE 64
@@ -29,6 +30,11 @@
 #define APST_MONITOR_STATION_LIST_SIZE 128
 #define AP_TRACKER_TIMEOUT 5000
 #define AP_TRACKER_LIST_SIZE 64
+#define APST_TRACKER_AP_TIMEOUT 20000
+#define APST_TRACKER_STATION_TIMEOUT 15000
+#define APST_TRACKER_STATION_TIME 450
+#define APST_TRACKER_STATION_LIST_SIZE 96
+#define APST_TRACKER_DISCOVERY_INTERVAL 5000
 
 extern Accesspoints accesspoints;
 extern Stations     stations;
@@ -73,6 +79,7 @@ class Scan {
         bool isAutoScanActive();
         bool isAPSTMonitorActive();
         bool isAPTrackerActive();
+        bool isAPSTTrackerActive();
 
         void nextChannel();
         void setChannel(uint8_t newChannel);
@@ -88,6 +95,13 @@ class Scan {
         String getTrackerSSID(int num);
         int getTrackerRSSI(int num);
         int8_t getTrackerTrend(int num);
+        uint16_t getTrackerAccesspointId(int num);
+        int findTrackerAccesspointRow(uint16_t apId);
+        uint16_t getTrackerStationCount(int num);
+        uint16_t getTrackerStationCountByAccesspoint(uint16_t apId);
+        String getTrackerStationMac(uint16_t apId, int num);
+        int getTrackerStationRSSI(uint16_t apId, int num);
+        int8_t getTrackerStationTrend(uint16_t apId, int num);
 
         uint16_t deauths = 0;
         uint16_t packets = 0;
@@ -103,7 +117,17 @@ class Scan {
 
         struct TrackerAccesspoint {
             uint8_t  mac[6];
+            uint16_t apId;
             String   ssid;
+            uint8_t  ch;
+            int      rssi;
+            int8_t   trend;
+            uint32_t lastSeen;
+        };
+
+        struct TrackerStation {
+            uint8_t  mac[6];
+            uint16_t apId;
             int      rssi;
             int8_t   trend;
             uint32_t lastSeen;
@@ -112,6 +136,7 @@ class Scan {
         SimpleList<MonitorDevice>* monitorAccesspoints;
         SimpleList<MonitorDevice>* monitorStations;
         SimpleList<TrackerAccesspoint>* trackerAccesspoints;
+        SimpleList<TrackerStation>* trackerStations;
 
         uint32_t sniffTime          = SCAN_DEFAULT_TIME; // how long the scan runs
         uint32_t snifferStartTime   = 0;                 // when the scan started
@@ -128,10 +153,14 @@ class Scan {
         bool channelHop     = true;
         uint16_t tmpDeauths = 0;
         uint16_t trackerPackets = 0;
+        uint32_t trackerDiscoveryTime = 0;
 
         bool apWithChannel(uint8_t ch);
+        bool trackerAccesspointOnChannel(uint8_t ch);
+        uint8_t nextTrackerChannel(uint8_t currentChannel);
         int findAccesspoint(uint8_t* mac);
         bool isAPSTMonitorStationScan();
+        bool isAPSTTrackerStationScan();
         int findMonitorDevice(SimpleList<MonitorDevice>* deviceList, uint8_t* mac);
         void resetAPSTMonitor();
         void updateMonitorAccesspoint(uint8_t* mac, uint8_t ch);
@@ -140,10 +169,21 @@ class Scan {
         void pruneMonitorDevices(SimpleList<MonitorDevice>* deviceList, uint32_t timeout);
         int findOldestMonitorDevice(SimpleList<MonitorDevice>* deviceList);
         int findTrackerAccesspoint(uint8_t* mac);
+        int findTrackerAccesspoint(uint16_t apId);
+        int findTrackerStation(uint8_t* mac, uint16_t apId);
+        int findTrackerStationListIndex(uint16_t apId, int num);
+        int findOldestTrackerStation();
         void resetAPTracker();
-        void updateTrackerAccesspoint(uint8_t id);
+        void resetAPSTTracker();
+        void startAPSTTrackerScan(bool advanceChannel);
+        void startAPSTTrackerStationScan();
+        void updateTrackerAccesspoint(uint8_t id, bool syncToAccesspoints = false);
+        void updateTrackerStation(uint8_t* mac, uint16_t apId, int rssi);
         void pruneTrackerAccesspoints(uint32_t timeout);
+        void pruneTrackerStations(uint32_t timeout);
+        void removeTrackerStationsForMissingAccesspoints();
         void sortTrackerAccesspoints();
+        void sortTrackerStations();
 
         String FILE_PATH = "/scan.json";
 };

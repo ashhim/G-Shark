@@ -381,6 +381,7 @@ const char D_SCAN_AP[] PROGMEM = "SCAN APs";
 const char D_SCAN_ST[] PROGMEM = "SCAN Stations";
 const char D_AUTOSCAN[] PROGMEM = "AUTOSCAN";
 const char D_AP_TRACKER[] PROGMEM = "AP TRACKER";
+const char D_APST_TRACKER[] PROGMEM = "APST TRACKER";
 const char D_SCANNING[] PROGMEM = "SCANNING";
 
 // SHOW MENU

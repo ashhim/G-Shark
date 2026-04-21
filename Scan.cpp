@@ -10,6 +10,7 @@ Scan::Scan() {
     monitorAccesspoints = new SimpleList<MonitorDevice>;
     monitorStations     = new SimpleList<MonitorDevice>;
     trackerAccesspoints = new SimpleList<TrackerAccesspoint>;
+    trackerStations     = new SimpleList<TrackerStation>;
 }
 
 void Scan::sniffer(uint8_t* buf, uint16_t len) {
@@ -45,6 +46,34 @@ void Scan::sniffer(uint8_t* buf, uint16_t len) {
         return;
     }
 
+    if (isAPSTTrackerStationScan()) {
+        int trackerAP = findTrackerAccesspoint(macFrom);
+        int rssi      = (int8_t)buf[0];
+
+        if (trackerAP >= 0) {
+            uint16_t apId = trackerAccesspoints->get(trackerAP).apId;
+
+            if (apId != 0xFFFF) {
+                updateTrackerStation(macTo, apId, rssi);
+                stations.add(macTo, apId);
+                trackerPackets = packets;
+            }
+        } else {
+            trackerAP = findTrackerAccesspoint(macTo);
+
+            if (trackerAP >= 0) {
+                uint16_t apId = trackerAccesspoints->get(trackerAP).apId;
+
+                if (apId != 0xFFFF) {
+                    updateTrackerStation(macFrom, apId, rssi);
+                    stations.add(macFrom, apId);
+                    trackerPackets = packets;
+                }
+            }
+        }
+        return;
+    }
+
     int accesspointNum = findAccesspoint(macFrom);
 
     if (accesspointNum >= 0) {
@@ -74,6 +103,7 @@ void Scan::start(uint8_t mode, uint32_t time, uint8_t nextmode, uint32_t continu
     bool wasAutoScanActive    = isAutoScanActive();
     bool wasAPSTMonitorActive = isAPSTMonitorActive();
     bool wasAPTrackerActive   = isAPTrackerActive();
+    bool wasAPSTTrackerActive = isAPSTTrackerActive();
 
     if (mode != SCAN_MODE_OFF) stop();
 
@@ -123,6 +153,15 @@ void Scan::start(uint8_t mode, uint32_t time, uint8_t nextmode, uint32_t continu
         // covering the band as we rotate channels between scans.
         WiFi.scanDelete();
         WiFi.scanNetworks(true, true, wifi_channel);
+    }
+
+    else if (mode == SCAN_MODE_APST_TRACKER) {
+        if (!wasAPSTTrackerActive) resetAPSTTracker();
+
+        trackerPackets = 0;
+        wifi::stopAP();
+        prntln(SC_START_AP);
+        startAPSTTrackerScan(false);
     }
 
     /* Station Scan */
@@ -203,6 +242,12 @@ void Scan::update() {
 
     if (isAPTrackerActive()) {
         pruneTrackerAccesspoints(AP_TRACKER_TIMEOUT);
+    }
+
+    if (isAPSTTrackerActive()) {
+        pruneTrackerAccesspoints(APST_TRACKER_AP_TIMEOUT);
+        pruneTrackerStations(APST_TRACKER_STATION_TIMEOUT);
+        removeTrackerStationsForMissingAccesspoints();
     }
 
     if (scanMode == SCAN_MODE_OFF) {
@@ -326,15 +371,51 @@ void Scan::update() {
         }
     }
 
+    else if (scanMode == SCAN_MODE_APST_TRACKER) {
+        int16_t results = WiFi.scanComplete();
+
+        if (results >= 0) {
+            trackerPackets = results;
+
+            for (int16_t i = 0; i < results && i < 256; i++) {
+                updateTrackerAccesspoint(i, true);
+            }
+
+            sortTrackerAccesspoints();
+            WiFi.scanDelete();
+
+            uint8_t targetChannel = wifi_channel;
+
+            if (!trackerAccesspointOnChannel(targetChannel)) {
+                targetChannel = nextTrackerChannel(targetChannel);
+
+                if (targetChannel > 0) setWifiChannel(targetChannel, true);
+            }
+
+            if ((targetChannel > 0) && trackerAccesspointOnChannel(targetChannel)) {
+                startAPSTTrackerStationScan();
+            } else {
+                startAPSTTrackerScan(true);
+            }
+        } else if (results == -2) {
+            WiFi.scanDelete();
+            startAPSTTrackerScan(true);
+        }
+    }
+
     // Stations
     else if ((sniffTime > 0) && (currentTime > snifferStartTime + sniffTime)) {
         wifi_promiscuous_enable(false);
 
-        if ((scanMode == SCAN_MODE_STATIONS) && !isAPSTMonitorStationScan()) {
+        if (isAPSTTrackerStationScan()) {
+            startAPSTTrackerScan(true);
+        }
+        else if ((scanMode == SCAN_MODE_STATIONS) && !isAPSTMonitorStationScan()) {
             stations.sort();
             stations.printAll();
+            start(SCAN_MODE_OFF);
         }
-        start(SCAN_MODE_OFF);
+        else start(SCAN_MODE_OFF);
     }
 
     if (syncClones) ssids.syncSelectedAPs();
@@ -376,6 +457,36 @@ bool Scan::apWithChannel(uint8_t ch) {
         if (accesspoints.getCh(i) == ch) return true;
 
     return false;
+}
+
+bool Scan::trackerAccesspointOnChannel(uint8_t ch) {
+    if ((ch < 1) || (ch > 14)) return false;
+
+    for (int i = 0; i < trackerAccesspoints->size(); i++) {
+        if (trackerAccesspoints->get(i).ch == ch) return true;
+    }
+
+    return false;
+}
+
+uint8_t Scan::nextTrackerChannel(uint8_t currentChannel) {
+    bool channels[15] = { false };
+
+    for (int i = 0; i < trackerAccesspoints->size(); i++) {
+        uint8_t ch = trackerAccesspoints->get(i).ch;
+
+        if ((ch >= 1) && (ch <= 14)) channels[ch] = true;
+    }
+
+    if ((currentChannel < 1) || (currentChannel > 14)) currentChannel = 1;
+
+    for (uint8_t offset = 1; offset <= 14; offset++) {
+        uint8_t ch = ((currentChannel - 1 + offset) % 14) + 1;
+
+        if (channels[ch]) return ch;
+    }
+
+    return 0;
 }
 
 void Scan::save(bool force, String filePath) {
@@ -501,6 +612,10 @@ bool Scan::isAPTrackerActive() {
     return scanMode == SCAN_MODE_AP_TRACKER || scan_continue_mode == SCAN_MODE_AP_TRACKER;
 }
 
+bool Scan::isAPSTTrackerActive() {
+    return scanMode == SCAN_MODE_APST_TRACKER || scan_continue_mode == SCAN_MODE_APST_TRACKER;
+}
+
 uint8_t Scan::getPercentage() {
     if (!isSniffing()) return 0;
 
@@ -570,6 +685,9 @@ String Scan::getMode() {
         case SCAN_MODE_AP_TRACKER:
             return str(D_AP_TRACKER);
 
+        case SCAN_MODE_APST_TRACKER:
+            return str(D_APST_TRACKER);
+
         default:
             return String();
     }
@@ -623,8 +741,59 @@ int8_t Scan::getTrackerTrend(int num) {
     return trackerAccesspoints->get(num).trend;
 }
 
+uint16_t Scan::getTrackerAccesspointId(int num) {
+    if (num < 0 || num >= trackerAccesspoints->size()) return 0xFFFF;
+    return trackerAccesspoints->get(num).apId;
+}
+
+int Scan::findTrackerAccesspointRow(uint16_t apId) {
+    return findTrackerAccesspoint(apId);
+}
+
+uint16_t Scan::getTrackerStationCount(int num) {
+    if (num < 0 || num >= trackerAccesspoints->size()) return 0;
+    return getTrackerStationCountByAccesspoint(trackerAccesspoints->get(num).apId);
+}
+
+uint16_t Scan::getTrackerStationCountByAccesspoint(uint16_t apId) {
+    if (apId == 0xFFFF) return 0;
+
+    uint16_t count = 0;
+
+    for (int i = 0; i < trackerStations->size(); i++) {
+        if (trackerStations->get(i).apId == apId) count++;
+    }
+
+    return count;
+}
+
+String Scan::getTrackerStationMac(uint16_t apId, int num) {
+    int index = findTrackerStationListIndex(apId, num);
+
+    if (index < 0) return String();
+    return bytesToStr(trackerStations->get(index).mac, 6);
+}
+
+int Scan::getTrackerStationRSSI(uint16_t apId, int num) {
+    int index = findTrackerStationListIndex(apId, num);
+
+    if (index < 0) return 0;
+    return trackerStations->get(index).rssi;
+}
+
+int8_t Scan::getTrackerStationTrend(uint16_t apId, int num) {
+    int index = findTrackerStationListIndex(apId, num);
+
+    if (index < 0) return 0;
+    return trackerStations->get(index).trend;
+}
+
 bool Scan::isAPSTMonitorStationScan() {
     return (scanMode == SCAN_MODE_STATIONS) && (scan_continue_mode == SCAN_MODE_APST_MONITOR);
+}
+
+bool Scan::isAPSTTrackerStationScan() {
+    return (scanMode == SCAN_MODE_STATIONS) && (scan_continue_mode == SCAN_MODE_APST_TRACKER);
 }
 
 int Scan::findMonitorDevice(SimpleList<MonitorDevice>* deviceList, uint8_t* mac) {
@@ -704,18 +873,134 @@ int Scan::findTrackerAccesspoint(uint8_t* mac) {
     return -1;
 }
 
-void Scan::resetAPTracker() {
-    trackerAccesspoints->clear();
-    trackerPackets = 0;
+int Scan::findTrackerAccesspoint(uint16_t apId) {
+    if (apId == 0xFFFF) return -1;
+
+    for (int i = 0; i < trackerAccesspoints->size(); i++) {
+        if (trackerAccesspoints->get(i).apId == apId) return i;
+    }
+
+    return -1;
 }
 
-void Scan::updateTrackerAccesspoint(uint8_t id) {
+int Scan::findTrackerStation(uint8_t* mac, uint16_t apId) {
+    if (!mac || (apId == 0xFFFF)) return -1;
+
+    for (int i = 0; i < trackerStations->size(); i++) {
+        TrackerStation station = trackerStations->get(i);
+
+        if ((station.apId == apId) && (memcmp(station.mac, mac, 6) == 0)) return i;
+    }
+
+    return -1;
+}
+
+int Scan::findTrackerStationListIndex(uint16_t apId, int num) {
+    if (apId == 0xFFFF || num < 0) return -1;
+
+    for (int i = 0, found = 0; i < trackerStations->size(); i++) {
+        if (trackerStations->get(i).apId == apId) {
+            if (found == num) return i;
+            found++;
+        }
+    }
+
+    return -1;
+}
+
+int Scan::findOldestTrackerStation() {
+    if (trackerStations->size() <= 0) return -1;
+
+    int oldest = 0;
+
+    for (int i = 1; i < trackerStations->size(); i++) {
+        if (trackerStations->get(i).lastSeen < trackerStations->get(oldest).lastSeen) oldest = i;
+    }
+
+    return oldest;
+}
+
+void Scan::resetAPTracker() {
+    trackerAccesspoints->clear();
+    trackerStations->clear();
+    trackerPackets = 0;
+    trackerDiscoveryTime = 0;
+}
+
+void Scan::resetAPSTTracker() {
+    resetAPTracker();
+}
+
+void Scan::startAPSTTrackerScan(bool advanceChannel) {
+    wifi_promiscuous_enable(false);
+
+    scanMode           = SCAN_MODE_APST_TRACKER;
+    scan_continue_mode = SCAN_MODE_OFF;
+    continueStartTime  = currentTime;
+    trackerPackets     = 0;
+
+    bool fullScan      = (trackerAccesspoints->size() <= 0) ||
+                         ((currentTime - trackerDiscoveryTime) >= APST_TRACKER_DISCOVERY_INTERVAL);
+    uint8_t targetCh   = wifi_channel;
+
+    if (!fullScan) {
+        if (advanceChannel || !trackerAccesspointOnChannel(targetCh)) {
+            targetCh = nextTrackerChannel(targetCh);
+
+            if (targetCh == 0) fullScan = true;
+        }
+    }
+
+    WiFi.scanDelete();
+
+    if (fullScan) {
+        trackerDiscoveryTime = currentTime;
+        WiFi.scanNetworks(true, true);
+    } else {
+        setWifiChannel(targetCh, true);
+        WiFi.scanNetworks(true, true, targetCh);
+    }
+}
+
+void Scan::startAPSTTrackerStationScan() {
+    packets             = 0;
+    tmpDeauths          = 0;
+    snifferStartTime    = currentTime;
+    snifferPacketTime   = currentTime;
+    snifferOutputTime   = currentTime;
+    snifferChannelTime  = currentTime;
+    sniffTime           = APST_TRACKER_STATION_TIME;
+    scanMode            = SCAN_MODE_STATIONS;
+    scan_continue_mode  = SCAN_MODE_APST_TRACKER;
+    channelHop          = false;
+
+    wifi::stopAP();
+    wifi_promiscuous_enable(true);
+}
+
+void Scan::updateTrackerAccesspoint(uint8_t id, bool syncToAccesspoints) {
     uint8_t* bssid = WiFi.BSSID(id);
 
     if (!bssid) return;
 
     int existing = findTrackerAccesspoint(bssid);
     int newRSSI  = WiFi.RSSI(id);
+    uint16_t apId = 0xFFFF;
+    uint8_t ch = WiFi.channel(id);
+
+    if (syncToAccesspoints) {
+        accesspoints.addOrUpdate(id, false, false);
+
+        int accesspointNum = accesspoints.find(bssid);
+
+        if (accesspointNum >= 0) {
+            apId = accesspoints.getID(accesspointNum);
+            ch   = accesspoints.getCh(accesspointNum);
+        }
+    } else if (existing >= 0) {
+        apId = trackerAccesspoints->get(existing).apId;
+        ch   = trackerAccesspoints->get(existing).ch;
+    }
 
     if (existing >= 0) {
         TrackerAccesspoint ap = trackerAccesspoints->get(existing);
@@ -724,6 +1009,8 @@ void Scan::updateTrackerAccesspoint(uint8_t id) {
         else if (newRSSI < ap.rssi) ap.trend = -1;
         else ap.trend = 0;
 
+        ap.apId     = apId;
+        ap.ch       = ch;
         ap.rssi     = newRSSI;
         ap.lastSeen = currentTime;
 
@@ -739,6 +1026,8 @@ void Scan::updateTrackerAccesspoint(uint8_t id) {
     TrackerAccesspoint ap;
 
     memcpy(ap.mac, bssid, 6);
+    ap.apId     = apId;
+    ap.ch       = ch;
     ap.rssi     = newRSSI;
     ap.trend    = 0;
     ap.lastSeen = currentTime;
@@ -759,9 +1048,57 @@ void Scan::updateTrackerAccesspoint(uint8_t id) {
     trackerAccesspoints->add(ap);
 }
 
+void Scan::updateTrackerStation(uint8_t* mac, uint16_t apId, int rssi) {
+    if (!mac || (apId == 0xFFFF)) return;
+
+    int existing = findTrackerStation(mac, apId);
+
+    if (existing >= 0) {
+        TrackerStation station = trackerStations->get(existing);
+
+        if (rssi > station.rssi) station.trend = 1;
+        else if (rssi < station.rssi) station.trend = -1;
+        else station.trend = 0;
+
+        station.rssi     = rssi;
+        station.lastSeen = currentTime;
+        trackerStations->replace(existing, station);
+        sortTrackerStations();
+        return;
+    }
+
+    if (trackerStations->size() >= APST_TRACKER_STATION_LIST_SIZE) {
+        int oldest = findOldestTrackerStation();
+
+        if (oldest >= 0) trackerStations->remove(oldest);
+    }
+
+    TrackerStation station;
+
+    memcpy(station.mac, mac, 6);
+    station.apId     = apId;
+    station.rssi     = rssi;
+    station.trend    = 0;
+    station.lastSeen = currentTime;
+    trackerStations->add(station);
+    sortTrackerStations();
+}
+
 void Scan::pruneTrackerAccesspoints(uint32_t timeout) {
     for (int i = trackerAccesspoints->size() - 1; i >= 0; i--) {
         if (currentTime - trackerAccesspoints->get(i).lastSeen >= timeout) trackerAccesspoints->remove(i);
+    }
+}
+
+void Scan::pruneTrackerStations(uint32_t timeout) {
+    for (int i = trackerStations->size() - 1; i >= 0; i--) {
+        if (currentTime - trackerStations->get(i).lastSeen >= timeout) trackerStations->remove(i);
+    }
+}
+
+void Scan::removeTrackerStationsForMissingAccesspoints() {
+    for (int i = trackerStations->size() - 1; i >= 0; i--) {
+        if (findTrackerAccesspoint(trackerStations->get(i).apId) < 0) trackerStations->remove(i);
     }
 }
 
@@ -772,4 +1109,15 @@ void Scan::sortTrackerAccesspoints() {
         return 1;
     });
     trackerAccesspoints->sort();
+}
+
+void Scan::sortTrackerStations() {
+    trackerStations->setCompare([](TrackerStation& a, TrackerStation& b) -> int {
+        if (a.apId < b.apId) return -1;
+        if (a.apId > b.apId) return 1;
+        if (a.rssi > b.rssi) return -1;
+        if (a.rssi < b.rssi) return 1;
+        return 0;
+    });
+    trackerStations->sort();
 }
