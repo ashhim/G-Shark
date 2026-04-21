@@ -884,7 +884,9 @@ String DisplayUI::getChannel() {
 }
 
 void DisplayUI::draw(bool force) {
-    if (force || ((currentTime - drawTime > drawInterval) && currentMenu)) {
+    uint16_t frameInterval = (mode == DISPLAY_MODE::APTRACKER) ? 50 : drawInterval;
+
+    if (force || ((currentTime - drawTime > frameInterval) && currentMenu)) {
         drawTime = currentTime;
 
         updatePrefix();
@@ -1093,9 +1095,16 @@ void DisplayUI::drawAPSTMonitor() {
 void DisplayUI::drawAPTracker() {
     display.setFont(ArialMT_Plain_10);
 
-    int count       = scan.getTrackerAccesspointCount();
-    int rowsPerPage = 5;
-    int rowHeight   = 10;
+    const int rowsPerPage            = 5;
+    const int rowHeight              = 10;
+    const int trackerCursorX         = 0;
+    const int trackerNameX           = 8;
+    const int trackerArrowX          = screenWidth - 6;
+    const int trackerValueRightX     = screenWidth - 10;
+    const uint16_t trackerScrollStep = 150;
+    const uint16_t trackerScrollHold = 700;
+    const int trackerCharWidth       = max(1, (int)display.getStringWidth("A"));
+    int count                        = scan.getTrackerAccesspointCount();
 
     if (count <= 0) trackerRow = 0;
     else if (trackerRow >= count) trackerRow = count - 1;
@@ -1113,31 +1122,43 @@ void DisplayUI::drawAPTracker() {
     int row = (trackerRow / rowsPerPage) * rowsPerPage;
 
     for (int i = row; i < count && i < row + rowsPerPage; i++) {
-        String ssid = scan.getTrackerSSID(i);
-        String line = ssid + ' ' + String(scan.getTrackerRSSI(i)) + String(F(" dBm"));
-        int tmpLen  = line.length();
+        String ssid      = scan.getTrackerSSID(i);
+        String rssiText  = String(scan.getTrackerRSSI(i)) + String(F(" dBm"));
+        int valueWidth   = display.getStringWidth(rssiText);
+        int nameWidth    = trackerValueRightX - valueWidth - trackerNameX - 4;
+        int visibleChars = nameWidth / trackerCharWidth;
+        int y            = (i - row + 1) * rowHeight;
 
-        if ((trackerRow == i) && (tmpLen >= maxLen - 1)) {
-            line = line + line;
-            line = line.substring(scrollCounter, scrollCounter + maxLen - 2);
+        if (visibleChars < 1) visibleChars = 1;
 
-            if (((scrollCounter > 0) && (scrollTime < currentTime - scrollSpeed)) ||
-                ((scrollCounter == 0) && (scrollTime < currentTime - scrollSpeed * 4))) {
+        if ((trackerRow == i) && (ssid.length() > visibleChars)) {
+            String spacer      = String(F("   "));
+            String marqueeSSID = ssid + spacer + ssid;
+            int scrollLimit    = ssid.length() + spacer.length();
+            uint16_t waitTime  = (scrollCounter == 0) ? trackerScrollHold : trackerScrollStep;
+
+            ssid = marqueeSSID.substring(scrollCounter, scrollCounter + visibleChars);
+
+            if (currentTime - scrollTime >= waitTime) {
                 scrollTime = currentTime;
                 scrollCounter++;
+
+                if (scrollCounter > scrollLimit) scrollCounter = 0;
             }
-
-            if (scrollCounter > tmpLen) scrollCounter = 0;
-        }
-        else if (tmpLen >= maxLen - 1) {
-            line = line.substring(0, maxLen - 2);
+        } else if (ssid.length() > visibleChars) {
+            ssid = ssid.substring(0, visibleChars);
         }
 
-        line = (trackerRow == i ? CURSOR : SPACE) + line;
-        int y = (i - row + 1) * rowHeight;
+        drawString(trackerCursorX, y, String(trackerRow == i ? CURSOR : SPACE));
 
-        drawString(0, y, line);
-        drawTrackerArrow(screenWidth - 8, y + 3, scan.getTrackerTrend(i));
+        display.setTextAlignment(TEXT_ALIGN_LEFT);
+        display.drawString(trackerNameX, y, replaceUtf8(ssid, String(QUESTIONMARK)));
+
+        display.setTextAlignment(TEXT_ALIGN_RIGHT);
+        display.drawString(trackerValueRightX, y, rssiText);
+        display.setTextAlignment(TEXT_ALIGN_LEFT);
+
+        drawTrackerArrow(trackerArrowX, y + 3, scan.getTrackerTrend(i));
     }
 }
 

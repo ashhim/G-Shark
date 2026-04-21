@@ -119,7 +119,10 @@ void Scan::start(uint8_t mode, uint32_t time, uint8_t nextmode, uint32_t continu
 
         trackerPackets = 0;
         prntln(SC_START_AP);
-        WiFi.scanNetworks(true, true);
+        // Track one channel per cycle so the list refreshes faster while still
+        // covering the band as we rotate channels between scans.
+        WiFi.scanDelete();
+        WiFi.scanNetworks(true, true, wifi_channel);
     }
 
     /* Station Scan */
@@ -309,7 +312,17 @@ void Scan::update() {
 
             sortTrackerAccesspoints();
             WiFi.scanDelete();
-            WiFi.scanNetworks(true, true);
+
+            if (channelHop) setWifiChannel(wifi_channel + 1, true);
+
+            WiFi.scanNetworks(true, true, wifi_channel);
+        } else if (results == -2) {
+            trackerPackets = 0;
+            WiFi.scanDelete();
+
+            if (channelHop) setWifiChannel(wifi_channel + 1, true);
+
+            WiFi.scanNetworks(true, true, wifi_channel);
         }
     }
 
