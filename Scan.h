@@ -17,6 +17,7 @@
 #define SCAN_MODE_SNIFFER 4
 #define SCAN_MODE_AUTOSCAN 5
 #define SCAN_MODE_APST_MONITOR 6
+#define SCAN_MODE_AP_TRACKER 7
 #define SCAN_DEFAULT_TIME 15000
 #define SCAN_DEFAULT_CONTINUE_TIME 10000
 #define SCAN_PACKET_LIST_SIZE 64
@@ -26,6 +27,8 @@
 #define APST_MONITOR_STATION_TIME 5000
 #define APST_MONITOR_AP_LIST_SIZE 128
 #define APST_MONITOR_STATION_LIST_SIZE 128
+#define AP_TRACKER_TIMEOUT 5000
+#define AP_TRACKER_LIST_SIZE 64
 
 extern Accesspoints accesspoints;
 extern Stations     stations;
@@ -39,6 +42,7 @@ extern bool appendFile(String path, String& buf);
 extern bool writeFile(String path, String& buf);
 extern void readFileToSerial(const String path);
 extern String escape(String str);
+extern String fixUtf8(String str);
 
 class Scan {
     public:
@@ -68,6 +72,7 @@ class Scan {
         bool isContinuous();
         bool isAutoScanActive();
         bool isAPSTMonitorActive();
+        bool isAPTrackerActive();
 
         void nextChannel();
         void setChannel(uint8_t newChannel);
@@ -78,6 +83,11 @@ class Scan {
         uint32_t getPacketRate();
         uint16_t getMonitorAccesspointCount();
         uint16_t getMonitorStationCount();
+        uint16_t getTrackerAccesspointCount();
+        uint16_t getTrackerPacketCount();
+        String getTrackerSSID(int num);
+        int getTrackerRSSI(int num);
+        int8_t getTrackerTrend(int num);
 
         uint16_t deauths = 0;
         uint16_t packets = 0;
@@ -91,8 +101,17 @@ class Scan {
             uint32_t lastSeen;
         };
 
+        struct TrackerAccesspoint {
+            uint8_t  mac[6];
+            String   ssid;
+            int      rssi;
+            int8_t   trend;
+            uint32_t lastSeen;
+        };
+
         SimpleList<MonitorDevice>* monitorAccesspoints;
         SimpleList<MonitorDevice>* monitorStations;
+        SimpleList<TrackerAccesspoint>* trackerAccesspoints;
 
         uint32_t sniffTime          = SCAN_DEFAULT_TIME; // how long the scan runs
         uint32_t snifferStartTime   = 0;                 // when the scan started
@@ -108,6 +127,7 @@ class Scan {
 
         bool channelHop     = true;
         uint16_t tmpDeauths = 0;
+        uint16_t trackerPackets = 0;
 
         bool apWithChannel(uint8_t ch);
         int findAccesspoint(uint8_t* mac);
@@ -119,6 +139,11 @@ class Scan {
         void updateMonitorDevice(SimpleList<MonitorDevice>* deviceList, uint8_t* mac, uint8_t ch, uint16_t maxSize);
         void pruneMonitorDevices(SimpleList<MonitorDevice>* deviceList, uint32_t timeout);
         int findOldestMonitorDevice(SimpleList<MonitorDevice>* deviceList);
+        int findTrackerAccesspoint(uint8_t* mac);
+        void resetAPTracker();
+        void updateTrackerAccesspoint(uint8_t id);
+        void pruneTrackerAccesspoints(uint32_t timeout);
+        void sortTrackerAccesspoints();
 
         String FILE_PATH = "/scan.json";
 };

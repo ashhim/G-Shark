@@ -71,7 +71,10 @@ enum class DISPLAY_MODE { OFF,
                           BUTTON_TEST,
                           MENU,
                           LOADSCAN,
+                          AUTOSCAN_VIEW,
                           PACKETMONITOR,
+                          APSTMONITOR,
+                          APTRACKER,
                           INTRO,
                           CLOCK,
                           CLOCK_DISPLAY,
@@ -115,6 +118,7 @@ class DisplayUI {
         void drawString(int x, int y, String str);
         void drawString(int row, String str);
         void drawLine(int x1, int y1, int x2, int y2);
+        void showIntro();
         // ====================== //
 
         DisplayUI();
@@ -131,16 +135,34 @@ class DisplayUI {
         void off();
 
     private:
-        int16_t selectedID    = 0; // i.e. access point ID to draw the apMenu
-        uint8_t scrollCounter = 0; // for horizontal scrolling
+        enum class CLOCK_ITEM { NONE,
+                                TIME,
+                                STOPWATCH,
+                                TIMER };
 
-        uint32_t scrollTime = 0;   // last time a character was moved
-        uint32_t drawTime   = 0;   // last time a frame was drawn
-        uint32_t startTime  = 0;   // when the screen was enabled
-        uint32_t buttonTime = 0;   // last time a button was pressed
+        int16_t selectedID      = 0; // i.e. access point ID to draw the apMenu
+        int16_t autoScanRow     = 0;
+        int16_t trackerRow      = 0;
+        uint8_t scrollCounter   = 0; // for horizontal scrolling
+        uint16_t apMonitorHistory[SCAN_PACKET_LIST_SIZE] = { 0 };
+        uint16_t stMonitorHistory[SCAN_PACKET_LIST_SIZE] = { 0 };
 
-        bool enabled = false;      // display enabled
-        bool tempOff = false;
+        uint32_t scrollTime             = 0; // last time a character was moved
+        uint32_t drawTime               = 0; // last time a frame was drawn
+        uint32_t startTime              = 0; // when the screen was enabled
+        uint32_t buttonTime             = 0; // last time a button was pressed
+        uint32_t autoScanMenuClickTime  = 0;
+        uint32_t apstMonitorSampleTime  = 0;
+        uint32_t stopwatchValue         = 0;
+        uint32_t stopwatchLastUpdate    = 0;
+        uint32_t timerValue             = 0;
+        uint32_t timerLastUpdate        = 0;
+        uint32_t apTrackerStopClickTime = 0;
+
+        bool enabled                   = false; // display enabled
+        bool tempOff                   = false;
+        bool autoScanMenuActionPending = false;
+        bool apTrackerStopPending      = false;
 
         // selected attack modes
         bool beaconSelected = false;
@@ -158,6 +180,9 @@ class DisplayUI {
         Menu showMenu;
         Menu attackMenu;
         Menu clockMenu;
+        Menu timeMenu;
+        Menu stopwatchMenu;
+        Menu timerMenu;
 
         Menu apListMenu;
         Menu stationListMenu;
@@ -170,6 +195,12 @@ class DisplayUI {
         Menu nameMenu;
         Menu ssidMenu;
 
+        Menu* autoScanMenuOwner       = NULL;
+        uint8_t autoScanMenuIndex     = 0;
+        CLOCK_ITEM selectedClockItem  = CLOCK_ITEM::TIME;
+        CLOCK_ITEM mainClockItem      = CLOCK_ITEM::NONE;
+        uint8_t clockEditField        = 0;
+
         void setupButtons();
 
         String getChannel();
@@ -179,15 +210,50 @@ class DisplayUI {
         void drawButtonTest();
         void drawMenu();
         void drawLoadingScan();
+        void drawAutoScanView();
         void drawPacketMonitor();
+        void drawAPSTMonitor();
+        void drawAPTracker();
         void drawIntro();
         void drawResetting();
         void clearMenu(Menu* menu);
+        void updateAPSTMonitorHistory();
+        void resetAPSTMonitorHistory();
+        void drawGraphLine(uint16_t* values, uint16_t maxValue, int graphTop, int graphBottom, bool dotted);
+        void drawDottedLine(int x0, int y0, int x1, int y1);
+        void drawTrackerArrow(int x, int y, int8_t trend);
+        int getGraphY(uint16_t value, uint16_t maxValue, int graphTop, int graphBottom);
+        void updateClockRuntime();
+        void drawClockItem(String title, String value, bool editing);
+        void adjustClockValue(int step);
+        String getClockItemLabel(CLOCK_ITEM item);
+        String getClockDisplayValue(CLOCK_ITEM item, bool compact);
+        String getMainClockLabel();
+        String formatTimeValue(bool compact);
+        String formatDurationValue(uint32_t value, bool compact);
+        String padTime(int value);
+        String getClockEditFieldLabel();
+        void openClockDisplay(CLOCK_ITEM item);
+        void openClockValueEditor(CLOCK_ITEM item);
+        void setMainClockItem(CLOCK_ITEM item);
+        void updateAutoScanMenuContext();
+        void cancelAPTrackerStopAction();
+        void handleAPTrackerStopClick();
+        void updateAPTrackerStopAction();
 
         // menu functions
         void changeMenu(Menu* menu);
         void goBack();
         void createMenu(Menu* menu, Menu* parent, std::function<void()>build);
+        void openAutoScanView();
+        void closeAutoScanView();
+        void startAutoScan();
+        void startAPSTMonitor();
+        void startAPTracker();
+        void handleAutoScanMenuClick();
+        void updateAutoScanMenuAction();
+        void cancelAutoScanMenuAction();
+        bool isAutoScanMenuSelected();
 
         void addMenuNode(Menu* menu, std::function<String()>getStr, std::function<void()>click, std::function<void()>hold);
         void addMenuNode(Menu* menu, std::function<String()>getStr, std::function<void()>click);

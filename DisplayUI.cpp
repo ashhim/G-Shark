@@ -139,6 +139,9 @@ void DisplayUI::setup() {
         }, [this]() {
             handleAutoScanMenuClick();
         });
+        addMenuNode(&scanMenu, D_AP_TRACKER, [this]() {
+            startAPTracker();
+        });
     });
 
     // SHOW MENU
@@ -603,6 +606,7 @@ void DisplayUI::update(bool force) {
     a->update();
     b->update();
     updateAutoScanMenuAction();
+    updateAPTrackerStopAction();
 
     if (mode == DISPLAY_MODE::INTRO) {
         if (currentTime - startTime >= screenIntroTime) mode = DISPLAY_MODE::MENU;
@@ -646,6 +650,7 @@ void DisplayUI::off() {
 
 void DisplayUI::showIntro() {
     cancelAutoScanMenuAction();
+    cancelAPTrackerStopAction();
     startTime  = currentTime;
     drawTime   = 0;
     scrollTime = currentTime;
@@ -665,6 +670,7 @@ void DisplayUI::setupButtons() {
         scrollTime    = currentTime;
         buttonTime    = currentTime;
         cancelAutoScanMenuAction();
+        cancelAPTrackerStopAction();
 
         if (!tempOff) {
             if (mode == DISPLAY_MODE::MENU) {                 // when in menu, go up or down with cursor
@@ -674,6 +680,11 @@ void DisplayUI::setupButtons() {
                 if (accesspoints.count() > 0) {
                     if (autoScanRow > 0) autoScanRow--;
                     else autoScanRow = accesspoints.count() - 1;
+                }
+            } else if (mode == DISPLAY_MODE::APTRACKER) {
+                if (scan.getTrackerAccesspointCount() > 0) {
+                    if (trackerRow > 0) trackerRow--;
+                    else trackerRow = scan.getTrackerAccesspointCount() - 1;
                 }
             } else if (mode == DISPLAY_MODE::PACKETMONITOR) { // when in packet monitor, change channel
                 scan.setChannel(wifi_channel + 1);
@@ -688,6 +699,7 @@ void DisplayUI::setupButtons() {
         scrollTime    = currentTime;
         buttonTime    = currentTime;
         cancelAutoScanMenuAction();
+        cancelAPTrackerStopAction();
         if (!tempOff) {
             if (mode == DISPLAY_MODE::MENU) {                 // when in menu, go up or down with cursor
                 if (currentMenu->selected > 0) currentMenu->selected--;
@@ -696,6 +708,11 @@ void DisplayUI::setupButtons() {
                 if (accesspoints.count() > 0) {
                     if (autoScanRow > 0) autoScanRow--;
                     else autoScanRow = accesspoints.count() - 1;
+                }
+            } else if (mode == DISPLAY_MODE::APTRACKER) {
+                if (scan.getTrackerAccesspointCount() > 0) {
+                    if (trackerRow > 0) trackerRow--;
+                    else trackerRow = scan.getTrackerAccesspointCount() - 1;
                 }
             } else if (mode == DISPLAY_MODE::PACKETMONITOR) { // when in packet monitor, change channel
                 scan.setChannel(wifi_channel + 1);
@@ -711,6 +728,7 @@ void DisplayUI::setupButtons() {
         scrollTime    = currentTime;
         buttonTime    = currentTime;
         cancelAutoScanMenuAction();
+        cancelAPTrackerStopAction();
         if (!tempOff) {
             if (mode == DISPLAY_MODE::MENU) {                 // when in menu, go up or down with cursor
                 if (currentMenu->selected < currentMenu->list->size() - 1) currentMenu->selected++;
@@ -719,6 +737,11 @@ void DisplayUI::setupButtons() {
                 if (accesspoints.count() > 0) {
                     if (autoScanRow < accesspoints.count() - 1) autoScanRow++;
                     else autoScanRow = 0;
+                }
+            } else if (mode == DISPLAY_MODE::APTRACKER) {
+                if (scan.getTrackerAccesspointCount() > 0) {
+                    if (trackerRow < scan.getTrackerAccesspointCount() - 1) trackerRow++;
+                    else trackerRow = 0;
                 }
             } else if (mode == DISPLAY_MODE::PACKETMONITOR) { // when in packet monitor, change channel
                 scan.setChannel(wifi_channel - 1);
@@ -733,6 +756,7 @@ void DisplayUI::setupButtons() {
         scrollTime    = currentTime;
         buttonTime    = currentTime;
         cancelAutoScanMenuAction();
+        cancelAPTrackerStopAction();
         if (!tempOff) {
             if (mode == DISPLAY_MODE::MENU) {                 // when in menu, go up or down with cursor
                 if (currentMenu->selected < currentMenu->list->size() - 1) currentMenu->selected++;
@@ -741,6 +765,11 @@ void DisplayUI::setupButtons() {
                 if (accesspoints.count() > 0) {
                     if (autoScanRow < accesspoints.count() - 1) autoScanRow++;
                     else autoScanRow = 0;
+                }
+            } else if (mode == DISPLAY_MODE::APTRACKER) {
+                if (scan.getTrackerAccesspointCount() > 0) {
+                    if (trackerRow < scan.getTrackerAccesspointCount() - 1) trackerRow++;
+                    else trackerRow = 0;
                 }
             } else if (mode == DISPLAY_MODE::PACKETMONITOR) { // when in packet monitor, change channel
                 scan.setChannel(wifi_channel - 1);
@@ -768,6 +797,10 @@ void DisplayUI::setupButtons() {
 
                 case DISPLAY_MODE::AUTOSCAN_VIEW:
                     closeAutoScanView();
+                    break;
+
+                case DISPLAY_MODE::APTRACKER:
+                    handleAPTrackerStopClick();
                     break;
 
                 case DISPLAY_MODE::PACKETMONITOR:
@@ -820,6 +853,10 @@ void DisplayUI::setupButtons() {
 
                 case DISPLAY_MODE::AUTOSCAN_VIEW:
                     closeAutoScanView();
+                    break;
+
+                case DISPLAY_MODE::APTRACKER:
+                    handleAPTrackerStopClick();
                     break;
 
                 case DISPLAY_MODE::PACKETMONITOR:
@@ -877,6 +914,10 @@ void DisplayUI::draw(bool force) {
                 drawAPSTMonitor();
                 break;
 
+            case DISPLAY_MODE::APTRACKER:
+                drawAPTracker();
+                break;
+
             case DISPLAY_MODE::INTRO:
                 drawIntro();
                 break;
@@ -901,7 +942,8 @@ void DisplayUI::drawButtonTest() {
 }
 
 void DisplayUI::drawMenu() {
-    bool compactMenu = (currentMenu == &mainMenu) || (currentMenu == &showMenu) || (currentMenu == &namemeListMenu);
+    bool compactMenu = (currentMenu == &mainMenu) || (currentMenu == &scanMenu) || (currentMenu == &showMenu) ||
+                       (currentMenu == &namemeListMenu);
     int  rowsPerPage = compactMenu ? 6 : 5;
     int  rowHeight   = compactMenu ? 10 : 12;
 
@@ -1046,6 +1088,57 @@ void DisplayUI::drawAPSTMonitor() {
 
     drawGraphLine(stMonitorHistory, maxValue, graphTop, graphBottom, true);
     drawGraphLine(apMonitorHistory, maxValue, graphTop, graphBottom, false);
+}
+
+void DisplayUI::drawAPTracker() {
+    display.setFont(ArialMT_Plain_10);
+
+    int count       = scan.getTrackerAccesspointCount();
+    int rowsPerPage = 5;
+    int rowHeight   = 10;
+
+    if (count <= 0) trackerRow = 0;
+    else if (trackerRow >= count) trackerRow = count - 1;
+    else if (trackerRow < 0) trackerRow = 0;
+
+    drawString(0, leftRight(String(F("APs [")) + String(count) + ']',
+                            String(F("PKTs [")) + String(scan.getTrackerPacketCount()) + ']',
+                            maxLen));
+
+    if (count <= 0) {
+        drawString(2, center(String(F("Tracking APs")), maxLen));
+        return;
+    }
+
+    int row = (trackerRow / rowsPerPage) * rowsPerPage;
+
+    for (int i = row; i < count && i < row + rowsPerPage; i++) {
+        String ssid = scan.getTrackerSSID(i);
+        String line = ssid + ' ' + String(scan.getTrackerRSSI(i)) + String(F(" dBm"));
+        int tmpLen  = line.length();
+
+        if ((trackerRow == i) && (tmpLen >= maxLen - 1)) {
+            line = line + line;
+            line = line.substring(scrollCounter, scrollCounter + maxLen - 2);
+
+            if (((scrollCounter > 0) && (scrollTime < currentTime - scrollSpeed)) ||
+                ((scrollCounter == 0) && (scrollTime < currentTime - scrollSpeed * 4))) {
+                scrollTime = currentTime;
+                scrollCounter++;
+            }
+
+            if (scrollCounter > tmpLen) scrollCounter = 0;
+        }
+        else if (tmpLen >= maxLen - 1) {
+            line = line.substring(0, maxLen - 2);
+        }
+
+        line = (trackerRow == i ? CURSOR : SPACE) + line;
+        int y = (i - row + 1) * rowHeight;
+
+        drawString(0, y, line);
+        drawTrackerArrow(screenWidth - 8, y + 3, scan.getTrackerTrend(i));
+    }
 }
 
 void DisplayUI::updateClockRuntime() {
@@ -1311,6 +1404,16 @@ void DisplayUI::startAPSTMonitor() {
     mode = DISPLAY_MODE::APSTMONITOR;
 }
 
+void DisplayUI::startAPTracker() {
+    cancelAutoScanMenuAction();
+    cancelAPTrackerStopAction();
+    scrollCounter = 0;
+    scrollTime    = currentTime;
+    trackerRow    = 0;
+    scan.start(SCAN_MODE_AP_TRACKER, 0, SCAN_MODE_OFF, 0, true, wifi_channel);
+    mode = DISPLAY_MODE::APTRACKER;
+}
+
 void DisplayUI::handleAutoScanMenuClick() {
     if (!scan.isAutoScanActive()) {
         startAutoScan();
@@ -1364,6 +1467,37 @@ void DisplayUI::refreshAttackMenu() {
 void DisplayUI::updateAutoScanMenuContext() {
     autoScanMenuOwner = currentMenu;
     autoScanMenuIndex = currentMenu ? currentMenu->selected : 0;
+}
+
+void DisplayUI::cancelAPTrackerStopAction() {
+    apTrackerStopPending   = false;
+    apTrackerStopClickTime = 0;
+}
+
+void DisplayUI::handleAPTrackerStopClick() {
+    if (!scan.isAPTrackerActive()) {
+        cancelAPTrackerStopAction();
+        mode = DISPLAY_MODE::MENU;
+        return;
+    }
+
+    if (apTrackerStopPending && (currentTime - apTrackerStopClickTime <= 1000)) {
+        cancelAPTrackerStopAction();
+        scan.stop();
+        mode = DISPLAY_MODE::MENU;
+        return;
+    }
+
+    apTrackerStopPending   = true;
+    apTrackerStopClickTime = currentTime;
+}
+
+void DisplayUI::updateAPTrackerStopAction() {
+    if (!apTrackerStopPending) return;
+
+    if ((mode != DISPLAY_MODE::APTRACKER) || !scan.isAPTrackerActive() || (currentTime - apTrackerStopClickTime > 1000)) {
+        cancelAPTrackerStopAction();
+    }
 }
 
 void DisplayUI::resetAPSTMonitorHistory() {
@@ -1433,6 +1567,18 @@ void DisplayUI::drawDottedLine(int x0, int y0, int x1, int y1) {
         }
 
         i++;
+    }
+}
+
+void DisplayUI::drawTrackerArrow(int x, int y, int8_t trend) {
+    if (trend > 0) {
+        drawLine(x, y + 4, x, y);
+        drawLine(x, y, x - 2, y + 2);
+        drawLine(x, y, x + 2, y + 2);
+    } else if (trend < 0) {
+        drawLine(x, y, x, y + 4);
+        drawLine(x, y + 4, x - 2, y + 2);
+        drawLine(x, y + 4, x + 2, y + 2);
     }
 }
 
