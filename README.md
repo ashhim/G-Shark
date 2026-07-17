@@ -7,7 +7,7 @@
 **Storage:** SPIFFS + EEPROM  
 **Display:** 128×64 SSD1306 OLED  
 **Development Framework:** Arduino Core for ESP8266  
-**Programming Language:** C++  
+**Programming Language:** C++
 
 ---
 
@@ -45,7 +45,7 @@
 
 ---
 
-## Overview
+## System Overview
 
 G-Shark is a compact ESP8266-based wireless research platform that integrates packet processing, wireless scanning, access point management, an embedded web server, OLED user interface, persistent configuration storage, and a modular firmware architecture into a single standalone device.
 
