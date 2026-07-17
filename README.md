@@ -81,7 +81,28 @@ The system has been designed to operate independently without requiring external
 
 ---
 
-### 2.3 ESP8266 Processing Unit
+### 2.3 GPIO Pin Mapping
+
+The pin assignments below are taken directly from the firmware configuration and should remain synchronized with the source code. The firmware targets ESP8266 (ESP-12E / ESP-12F) hardware, and the OLED communicates over the I²C bus using address `0x3C`.
+
+| Component | GPIO | NodeMCU Pin | Purpose |
+|-----------|------|-------------|---------|
+| OLED SDA | GPIO4 | D2 | I²C Data |
+| OLED SCL | GPIO5 | D1 | I²C Clock |
+| OLED Address | 0x3C | — | SSD1306 I²C Address |
+| UP Button | GPIO14 | D5 | Navigation Up |
+| DOWN Button | GPIO12 | D6 | Navigation Down |
+| SELECT / Button A | GPIO2 | D4 | Select / Confirm |
+| BACK / Button B | GPIO0 | D3 | Back / Cancel |
+| NeoPixel LED | GPIO15 | D8 | System Status Indicator |
+| Power | 3.3V | 3V3 | Device Power |
+| Ground | GND | GND | Common Ground |
+
+All peripherals share a common ground.
+
+---
+
+### 2.4 ESP8266 Processing Unit
 
 The ESP8266 serves as the central processing unit of the G-Shark platform. It is responsible for executing every firmware subsystem including wireless communication, display rendering, filesystem management, HTTP services, configuration storage, packet processing, and hardware interaction.
 
@@ -104,7 +125,7 @@ The processor simultaneously manages multiple firmware modules while maintaining
 
 ---
 
-### 2.4 Wireless Communication Hardware
+### 2.5 Wireless Communication Hardware
 
 The integrated IEEE 802.11 b/g/n wireless radio enables the firmware to perform wireless communication and network management directly through the ESP8266 hardware.
 
@@ -114,7 +135,7 @@ The firmware dynamically configures the wireless hardware according to the activ
 
 ---
 
-### 2.5 OLED Display Module
+### 2.6 OLED Display Module
 
 G-Shark incorporates a 128×64 monochrome SSD1306 OLED display connected through the I²C interface.
 
@@ -137,7 +158,7 @@ The display rendering engine continuously synchronizes with the firmware to ensu
 
 ---
 
-### 2.6 Navigation Buttons
+### 2.7 Navigation Buttons
 
 Physical push buttons provide direct interaction with the firmware.
 
@@ -157,7 +178,7 @@ Button events are continuously monitored by the firmware and processed in real t
 
 ---
 
-### 2.7 Flash Memory Architecture
+### 2.8 Flash Memory Architecture
 
 The onboard flash memory stores both the firmware image and the SPIFFS filesystem.
 
@@ -179,7 +200,7 @@ This architecture enables complete customization of the embedded web interface w
 
 ---
 
-### 2.8 EEPROM Configuration Storage
+### 2.9 EEPROM Configuration Storage
 
 EEPROM emulation provides persistent storage for firmware configuration.
 
@@ -200,7 +221,7 @@ The configuration manager automatically validates stored data before applying it
 
 ---
 
-### 2.9 Hardware Block Diagram
+### 2.10 Hardware Block Diagram
 
 ```
                     ┌──────────────────────────────┐
@@ -230,7 +251,7 @@ The configuration manager automatically validates stored data before applying it
 
 ---
 
-### 2.10 Hardware Characteristics
+### 2.11 Hardware Characteristics
 
 | Feature | Specification |
 |----------|---------------|
