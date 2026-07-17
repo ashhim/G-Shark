@@ -2412,7 +2412,6 @@ The modular implementation allows future expansion without affecting unrelated c
 | Modular Architecture | Yes |
 | Standalone Operation | Fully Supported |
 | Firmware Integration | Runtime Controller |
-```
 
 
 ## Attack Framework
@@ -2917,7 +2916,6 @@ The modular implementation simplifies maintenance while supporting future firmwa
 | Configuration Storage | EEPROM |
 | Platform | ESP8266 |
 | Firmware Integration | Runtime Controller |
-```
 
 
 
