@@ -30,7 +30,7 @@
 15. [Embedded Web UI](#embedded-web-ui)
 16. [SPIFFS File System](#spiffs-file-system)
 17. [EEPROM Configuration](#eeprom-configuration)
-18. [Command Line Interface](#command-line-interface)
+18. [Command-Line Interface](#command-line-interface)
 19. [Configuration System](#configuration-system)
 20. [Web API & Firmware Communication](#web-api--firmware-communication)
 21. [Display Rendering Engine](#display-rendering-engine)
@@ -3459,7 +3459,7 @@ These characteristics simplify long-term maintenance and future development.
 ``
 
 
-## Embedded Web Interface
+## Embedded Web UI
 
 ### 15.1 Overview
 
@@ -3721,7 +3721,7 @@ These characteristics simplify maintenance while supporting future enhancements.
 
 ---
 
-### 15.14 Embedded Web Interface Summary
+### 15.14 Embedded Web UI Summary
 
 | Feature | Description |
 |----------|-------------|
@@ -4318,7 +4318,7 @@ These characteristics provide reliable long-term configuration management while 
 
 
 
-## 18. Command-Line Interface
+## Command-Line Interface
 
 ### 18.1 Overview
 
@@ -4590,7 +4590,7 @@ These principles simplify future expansion while maintaining reliable operation 
 
 
 
-## 19. Configuration System
+## Configuration System
 
 ### 19.1 Overview
 
@@ -4868,7 +4868,7 @@ These characteristics simplify firmware maintenance while supporting future feat
 
 
 
-## 20. Web API & Firmware Communication
+## Web API & Firmware Communication
 
 ### 20.1 Overview
 
@@ -5148,7 +5148,7 @@ These characteristics provide a scalable and maintainable communication layer be
 | Standalone Operation | Fully Supported |
 
 
-## 21. Display Rendering Engine
+## Display Rendering Engine
 
 ### 21.1 Overview
 
@@ -5420,7 +5420,7 @@ These characteristics provide a reliable graphical subsystem while minimizing pr
 | Standalone Operation | Fully Supported |
 
 
-## 22. Power Management
+## Power Management
 
 ### 22.1 Overview
 
@@ -5694,7 +5694,7 @@ These characteristics contribute to stable and efficient firmware execution on t
 | Standalone Operation | Fully Supported |
 
 
-## 23. System Configuration Options
+## System Configuration Options
 
 ### 23.1 Overview
 
@@ -5960,7 +5960,7 @@ These characteristics simplify configuration management while supporting future 
 
 
 
-## 24. Compilation & Build Process
+## Compilation & Build Process
 
 ### 24.1 Overview
 
@@ -6246,7 +6246,7 @@ These characteristics provide a scalable and maintainable firmware build environ
 
 
 
-## 25. Installation & Flashing
+## Installation & Flashing
 
 ### 25.1 Overview
 
@@ -6534,7 +6534,7 @@ These design principles provide a dependable installation process for the ESP826
 
 
 
-## 26. Firmware Customization
+## Firmware Customization
 
 ### 26.1 Overview
 
@@ -6608,7 +6608,7 @@ These modifications can be performed without affecting unrelated firmware module
 
 ---
 
-### 26.5 Embedded Web Interface Customization
+### 26.5 Embedded Web UI Customization
 
 The browser-based interface is fully customizable through the SPIFFS filesystem.
 
@@ -6804,7 +6804,7 @@ These characteristics enable long-term extensibility while maintaining firmware 
 
 
 
-## 27. Project Resources
+## Project Resources
 
 ### 27.1 Overview
 
@@ -7085,7 +7085,7 @@ These principles provide a scalable foundation for continued firmware developmen
 | Standalone Operation | Fully Supported |
 
 
-## 28. Troubleshooting
+## Troubleshooting
 
 ### 28.1 Overview
 
@@ -7358,7 +7358,7 @@ These characteristics improve maintainability while reducing the time required t
 
 
 
-## 29. License
+## License
 
 This project is based on the original work of **Spacehuhn Technologies**, which is licensed under the MIT License.
 
