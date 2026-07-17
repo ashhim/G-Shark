@@ -27,7 +27,7 @@
 12. [Beacon Frame System](#beacon-frame-system)
 13. [Probe Request System](#probe-request-system)
 14. [Captive Portal Framework](#captive-portal-framework)
-15. [Embedded Web Interface](#embedded-web-interface)
+15. [Embedded Web UI](#embedded-web-ui)
 16. [SPIFFS File System](#spiffs-file-system)
 17. [EEPROM Configuration](#eeprom-configuration)
 18. [Command Line Interface](#command-line-interface)
@@ -3456,8 +3456,7 @@ These characteristics simplify long-term maintenance and future development.
 | Platform | ESP8266 |
 | Firmware Architecture | Modular |
 | Standalone Operation | Fully Supported |
-```
-
+``
 
 
 ## Embedded Web Interface
