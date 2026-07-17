@@ -1,244 +1,236 @@
 # G-Shark
 
-G-Shark is a custom **ESP8266 wearable Wi-Fi tool** built around the ESP8266 Deauther codebase and extended with a compact OLED-driven UI, hardware buttons, live scan views, a serial CLI, a local web interface, SPIFFS-backed assets, persistent settings, and multiple monitoring / scanning modes.
-
-> This repository is a reverse-engineered firmware project.  
-> The documentation below describes the code that exists in the firmware, the hardware it expects, and the runtime workflow exposed by the source.
-
----
-
 ## Contents
 
-- [Overview](#overview)
-- [Project Goals](#project-goals)
-- [Hardware Architecture](#hardware-architecture)
-- [GPIO / Pinout](#gpio--pinout)
-- [Hardware BOM](#hardware-bom)
-- [Power Architecture](#power-architecture)
-- [Flash, EEPROM, and SPIFFS](#flash-eeprom-and-spiffs)
-- [Module Dependency Graph](#module-dependency-graph)
-- [Feature Inventory](#feature-inventory)
-- [Display / Screen Output](#display--screen-output)
-- [Menu Hierarchy](#menu-hierarchy)
-- [Web Interface](#web-interface)
-- [CLI Reference](#cli-reference)
-- [Scan Architecture](#scan-architecture)
-- [Attack Architecture](#attack-architecture)
-- [Workflow Summary](#workflow-summary)
-- [Build / Flash Notes](#build--flash-notes)
-- [Files Included](#files-included)
-
----
+* [Overview](#overview)
+* [Project Architecture](#project-architecture)
+* [Hardware Architecture](#hardware-architecture)
+* [GPIO / Pinout](#gpio--pinout)
+* [Hardware BOM](#hardware-bom)
+* [Power Architecture](#power-architecture)
+* [Flash, EEPROM, and SPIFFS](#flash-eeprom-and-spiffs)
+* [Module Dependency Graph](#module-dependency-graph)
+* [Feature Inventory](#feature-inventory)
+* [Display / Screen Output](#display--screen-output)
+* [Menu Hierarchy](#menu-hierarchy)
+* [Web Interface](#web-interface)
+* [CLI Reference](#cli-reference)
+* [Scan Architecture](#scan-architecture)
+* [Attack Architecture](#attack-architecture)
+* [Workflow Summary](#workflow-summary)
+* [Build / Flash Notes](#build--flash-notes)
+* [Files Included](#files-included)
 
 ## Overview
 
-G-Shark is centered on the **ESP8266** and the project code confirms ESP8266-specific APIs, Wi-Fi promiscuous sniffing, raw frame transmission, and flash-backed configuration. It is **not** an ESP32 firmware and it does **not** implement Bluetooth/BLE.
+G-Shark is a custom **ESP8266 wearable Wi-Fi tool** built around the ESP8266 Deauther codebase and extended with a compact OLED-driven UI, hardware buttons, live scan views, a serial CLI, a local web interface, SPIFFS-backed assets, persistent settings, and multiple monitoring and scanning modes.
 
-The firmware combines:
+The firmware combines the following subsystems into a single embedded platform:
 
-- OLED UI (`DisplayUI`)
-- Button navigation
-- AP / station scanning
-- Live monitoring modes
-- Packet monitor
-- Clock / stopwatch / timer screens
-- Serial CLI
-- Local web UI from SPIFFS
-- Persistent settings in EEPROM emulation
-- Optional RTC support (`DS3231`)
-- RGB LED status support
-- Captive-portal style local web presentation
+* OLED user interface through `DisplayUI`
+* Physical button navigation
+* Wi-Fi scanning and live monitoring
+* Packet monitor screens
+* AP tracker and APST tracker views
+* Clock, stopwatch, and timer screens
+* Serial command-line control
+* Local web interface served from SPIFFS
+* Persistent configuration storage
+* Optional RTC support
+* RGB LED status output
+* Captive portal-style local presentation
+* Modular wireless analysis and control workflow
 
----
+The project is centered on a compact wearable form factor, with the display, buttons, scan logic, target selection, and runtime controls all designed to work together as one integrated embedded system.
 
-## Project Goals
+## Project Architecture
 
-The codebase is designed to run as a compact standalone device that can:
+G-Shark follows a layered firmware architecture:
 
-- scan nearby Wi-Fi access points and stations
-- present live network data on the OLED
-- expose controls over serial and browser interfaces
-- store settings persistently
-- drive a wearable display and a small button set
-- provide multiple monitoring views for signal analysis
+```text
+esp8266_deauther.ino
+├── settings
+├── wifi
+├── DisplayUI
+├── Scan
+├── Attack
+├── CLI
+├── Accesspoints
+├── Stations
+├── SSIDs
+├── Names
+├── LED
+└── SPIFFS assets / web UI
+```
 
-The repository also contains later UI extensions referenced in the attached change logs, including:
+### Architecture summary
 
-- `AP TRACKER`
-- `APST TRACKER`
-- `AUTOSCAN`
-- `APST MONITOR`
-- `CLOCK`
-- live AP/station list views
-- continuous scan behavior updates
+| Layer             | Role                                      |
+| ----------------- | ----------------------------------------- |
+| Hardware layer    | ESP8266, OLED, buttons, LED, optional RTC |
+| Driver layer      | Wi-Fi, display, GPIO, filesystem, EEPROM  |
+| State layer       | APs, stations, SSIDs, names, settings     |
+| UI layer          | OLED menus, live screens, status pages    |
+| Control layer     | Scan, attack, CLI, web interface          |
+| Persistence layer | EEPROM config and SPIFFS content          |
 
----
+The system is designed so that scan results, selected targets, settings, and UI state can be shared across multiple front ends.
 
 ## Hardware Architecture
 
-The active firmware profile is a compact watch-style ESP8266 build with:
+The active watch profile uses an ESP8266 module with an I²C OLED display, four buttons, one WS2812-style RGB LED, and optional DS3231 RTC support.
 
-- ESP8266 module
-- I²C OLED display
-- four navigation buttons
-- one WS2812 / NeoPixel status LED
-- optional DS3231 RTC
-- flash-backed settings and files
+### Core hardware
 
-The code supports several board profiles, but the active watch configuration uses the following GPIO map.
+| Component         | Role                                 |
+| ----------------- | ------------------------------------ |
+| ESP8266 module    | Main microcontroller                 |
+| SH1106 OLED       | Primary display controller           |
+| Buttons           | Menu and action input                |
+| WS2812 / NeoPixel | Status indicator                     |
+| DS3231 RTC        | Timekeeping, if enabled              |
+| Internal flash    | Firmware + SPIFFS + EEPROM emulation |
 
----
+### Bus overview
+
+| Bus       | Devices                              |
+| --------- | ------------------------------------ |
+| I²C       | OLED, optional DS3231 RTC            |
+| GPIO      | Buttons, RGB LED                     |
+| Wi-Fi     | Scanner, monitor, AP/packet features |
+| SPI flash | System storage and filesystem        |
 
 ## GPIO / Pinout
 
 ### Active watch profile
 
-| Function | GPIO | NodeMCU label | Notes |
-|---|---:|---|---|
-| OLED SDA | GPIO4 | D2 | I²C data |
-| OLED SCL | GPIO5 | D1 | I²C clock |
-| Button UP | GPIO14 | D5 | menu up / scroll up |
-| Button DOWN | GPIO12 | D6 | menu down / scroll down |
-| Button A | GPIO2 | D4 | select / confirm |
-| Button B | GPIO0 | D3 | back / cancel |
-| NeoPixel DIN | GPIO15 | D8 | status LED |
-
-### Bus notes
-
-- OLED uses I²C.
-- DS3231, if enabled, shares the same I²C bus.
-- The current profile is configured for an SH1106-style OLED at address `0x3C`.
+| Function     |   GPIO | NodeMCU label | Notes                   |
+| ------------ | -----: | ------------- | ----------------------- |
+| OLED SDA     |  GPIO4 | D2            | I²C data                |
+| OLED SCL     |  GPIO5 | D1            | I²C clock               |
+| Button UP    | GPIO14 | D5            | menu up / scroll up     |
+| Button DOWN  | GPIO12 | D6            | menu down / scroll down |
+| Button A     |  GPIO2 | D4            | select / confirm        |
+| Button B     |  GPIO0 | D3            | back / cancel           |
+| NeoPixel DIN | GPIO15 | D8            | status LED              |
 
 ### Boot-sensitive pins
 
-| GPIO | Role |
-|---|---|
-| GPIO0 | boot mode-sensitive |
-| GPIO2 | boot mode-sensitive |
+| GPIO   | Role                |
+| ------ | ------------------- |
+| GPIO0  | boot mode-sensitive |
+| GPIO2  | boot mode-sensitive |
 | GPIO15 | boot mode-sensitive |
 
-These pins matter during power-up because the ESP8266 bootloader samples them.
+### I²C display configuration
 
----
+| Parameter    | Value    |
+| ------------ | -------- |
+| Display type | SH1106   |
+| Interface    | I²C      |
+| Address      | `0x3C`   |
+| Resolution   | 128 × 64 |
 
 ## Hardware BOM
 
 ### Confirmed by firmware
 
-- ESP8266 module
-- SH1106 OLED or compatible SSD1306/OLED variant, depending on compile-time profile
-- 4 tactile buttons
-- 1 WS2812 / NeoPixel RGB LED
-- optional DS3231 RTC
-- onboard SPI flash
+| Component             |        Qty | Purpose                       |
+| --------------------- | ---------: | ----------------------------- |
+| ESP8266 module        |          1 | Main controller               |
+| SH1106 OLED           |          1 | Watch display                 |
+| Tactile buttons       |          4 | Navigation and action control |
+| WS2812 / NeoPixel LED |          1 | Status indication             |
+| DS3231 RTC            | 1 optional | Timekeeping                   |
+| Internal SPI flash    |          1 | Firmware and data storage     |
 
-### Required but not defined in firmware
+### Required for a functional build
 
-The firmware does not define the exact electrical implementation of these items, but a functional build normally also requires:
-
-- 3.3 V regulator
-- battery or regulated supply
-- charging circuit if battery powered
-- power switch
-- pull-ups / pull-downs for ESP8266 boot pins
-- decoupling capacitors
-- programming header or USB-UART bridge
-- antenna matched to the chosen ESP8266 module
-
-### Not confirmed by source
-
-The repository does not provide a schematic, PCB layout, or Gerbers, so the following are not verifiable from the firmware alone:
-
-- exact ESP8266 module variant
-- battery capacity
-- charge IC
-- protection IC
-- regulator model
-- connector selection
-- enclosure mechanics
-- antenna routing
-
----
+| Component                                | Purpose                           |
+| ---------------------------------------- | --------------------------------- |
+| 3.3 V regulator                          | Power for ESP8266 and peripherals |
+| Battery or regulated supply              | Portable operation                |
+| Power switch                             | On/off control                    |
+| Programming header or USB-UART bridge    | Flashing and serial access        |
+| Pull resistors and decoupling capacitors | ESP8266 support circuitry         |
+| Antenna matched to module                | Wi-Fi radio operation             |
 
 ## Power Architecture
 
-The firmware assumes a **3.3 V logic rail**.
-
-### Likely power path
+G-Shark is built around a single 3.3 V logic rail.
 
 ```text
-USB 5V / battery input
-    -> charger or regulator
-    -> 3.3V rail
-    -> ESP8266 + OLED + buttons + LED + RTC
+USB 5V / battery
+→ charging or regulation stage
+→ 3.3V rail
+→ ESP8266 + OLED + buttons + LED + RTC
 ```
 
-### Firmware-side power behavior
+### Power behavior
 
-Confirmed behaviors:
+| Subsystem                        | Relative load |
+| -------------------------------- | ------------- |
+| Wi-Fi transmit / frame injection | Highest       |
+| Wi-Fi scan / receive             | High          |
+| OLED rendering                   | Moderate      |
+| RGB LED activity                 | Moderate      |
+| RTC standby                      | Minimal       |
+| Buttons                          | Negligible    |
 
-- OLED can be turned on/off
-- display contrast is configured
-- Wi-Fi is actively used in scan / monitor / AP modes
-- NeoPixel status output is supported
-- the firmware does not implement deep sleep as a primary operating mode
+### Firmware-controlled power features
 
-### Power characteristics
-
-Relative load order:
-
-1. Wi-Fi transmit / injection
-2. Wi-Fi receive / scan
-3. OLED rendering
-4. NeoPixel activity
-5. RTC standby
-6. buttons
-
-The firmware does not implement battery percentage calculation or fuel-gauge logic.
-
----
+| Feature                            | Present |
+| ---------------------------------- | ------- |
+| OLED on/off                        | Yes     |
+| OLED brightness / contrast control | Yes     |
+| Wi-Fi active control               | Yes     |
+| NeoPixel status control            | Yes     |
+| Deep sleep as primary mode         | No      |
+| Battery percentage calculation     | No      |
+| Low-battery shutdown logic         | No      |
 
 ## Flash, EEPROM, and SPIFFS
 
-### Flash layout
+### Flash usage
 
 The ESP8266 internal flash is used for:
 
-- firmware code
-- EEPROM emulation
-- SPIFFS filesystem
+* firmware code
+* EEPROM emulation
+* SPIFFS filesystem
 
 ### EEPROM
 
-The firmware uses EEPROM emulation for persistent settings.
+EEPROM emulation stores persistent configuration such as:
 
-Key points:
-
-- settings are stored in a structured config block
-- a magic number is used for validation
-- settings are loaded on boot and saved on demand
+* scan behavior
+* display settings
+* LED settings
+* AP / attack options
+* web / interface preferences
+* boot metadata
 
 ### SPIFFS
 
-SPIFFS stores the local web UI and assets such as:
+SPIFFS stores local assets used by the firmware:
 
-- HTML pages
-- JavaScript
-- CSS
-- images
-- audio assets
-- named page templates
-- generated or exported content
+* HTML pages
+* JavaScript files
+* CSS
+* images
+* audio assets
+* named portal pages
+* generated or exported content
 
-### Notable content in the repository
+### Notable asset families
 
-- `data/web/`
-- `data/nameme/`
-- `data/logo.png`
-- `data/instapage.jpg`
-- `data/music.mp3`
-
----
+| Path or asset group  | Role                        |
+| -------------------- | --------------------------- |
+| `data/web/`          | web interface files         |
+| `data/nameme/`       | branded or themed page sets |
+| `data/logo.png`      | visual identity             |
+| `data/instapage.jpg` | portal artwork              |
+| `data/music.mp3`     | audio asset                 |
 
 ## Module Dependency Graph
 
@@ -260,98 +252,90 @@ esp8266_deauther.ino
 
 ### Dependency highlights
 
-- `DisplayUI` depends on `Scan`, `Attack`, `Accesspoints`, `Stations`, `SSIDs`, `Names`, and settings.
-- `Scan` depends on Wi-Fi hardware APIs plus the AP/station databases.
-- `Attack` depends on selected APs, stations, SSIDs, and Wi-Fi raw transmit support.
-- `CLI` and the web UI expose the same internal state from different frontends.
-- `Settings` is the central persistence layer.
-
----
+| Module        | Depends on                                                               |
+| ------------- | ------------------------------------------------------------------------ |
+| `DisplayUI`   | `Scan`, `Attack`, `Accesspoints`, `Stations`, `SSIDs`, `Names`, settings |
+| `Scan`        | Wi-Fi APIs, AP/station databases                                         |
+| `Attack`      | selected APs, stations, SSIDs, Wi-Fi raw transmit support                |
+| `CLI`         | shared runtime state and command dispatch                                |
+| Web interface | SPIFFS assets, shared state, HTTP server                                 |
+| `Settings`    | EEPROM and configuration structures                                      |
 
 ## Feature Inventory
 
-### Core
+### Core system features
 
-- ESP8266 firmware
-- modular class design
-- serial console
-- OLED front panel
-- local web interface
-- SPIFFS-backed assets
-- EEPROM-backed settings
-- optional RTC integration
-- RGB LED status output
+* ESP8266 firmware
+* Modular class-based design
+* Serial console
+* OLED front panel
+* Local web interface
+* SPIFFS-backed assets
+* EEPROM-backed settings
+* Optional RTC integration
+* RGB LED status output
 
-### Wi-Fi
+### Wi-Fi features
 
-- AP scanning
-- station scanning
-- combined scan modes
-- hidden AP detection
-- channel management
-- vendor lookup from OUI table
-- promiscuous sniffing
-- raw 802.11 frame transmission
-- live packet statistics
+* AP scanning
+* station scanning
+* combined scan modes
+* hidden AP detection
+* channel management
+* vendor lookup from OUI data
+* promiscuous sniffing
+* raw 802.11 frame transmission
+* live packet statistics
 
-### UI / UX
+### UI features
 
-- splash / intro screen
-- main menu
-- scan menu
-- select menu
-- attack menu
-- packet monitor
-- AP monitor / station monitor variants
-- AP tracker
-- APST tracker
-- APST monitor
-- clock
-- stopwatch
-- timer
-- loading screens
-- button test
-- scrolling lists
-- fixed-value right-aligned metrics
-- trend arrows on live data
+* splash / intro screen
+* main menu
+* scan menu
+* select menu
+* attack menu
+* packet monitor
+* AP tracker
+* APST tracker
+* APST monitor
+* clock
+* stopwatch
+* timer
+* loading screens
+* button test
+* scrolling lists
+* fixed metric columns
+* trend arrows
+* real-time counters
 
-### Storage / persistence
+### Storage and persistence
 
-- settings save / load
-- AP / station / SSID / name lists
-- SPIFFS file operations from CLI
-- web assets stored locally
-- generated JSON responses for the browser UI
+* settings save/load
+* AP / station / SSID / name lists
+* SPIFFS file operations
+* web assets stored locally
+* JSON status outputs for the browser UI
 
-### Web interface
+### Web and CLI features
 
-- offline browser-based control surface
-- dynamic status pages
-- scan data pages
-- attack status pages
-- settings pages
-- local portal behavior for compatible clients
-
-### CLI
-
-- scan commands
-- select/deselect commands
-- save/load commands
-- file commands
-- LED commands
-- screen commands
-- settings commands
-- script execution commands
-- packet send commands
-- attack commands
-
----
+* offline browser-based control surface
+* dynamic status pages
+* scan data pages
+* attack status pages
+* settings pages
+* scan commands
+* selection commands
+* LED commands
+* screen commands
+* script execution commands
+* packet send commands
+* configuration persistence commands
 
 ## Display / Screen Output
 
-The OLED output is organized into screens and menus. Exact wording comes from `language.h` and the display logic in `DisplayUI.cpp`.
+This section documents the primary visible output used by the firmware.
 
-### Boot / intro
+### Boot and intro
 
 ```text
 CRABOX
@@ -413,17 +397,9 @@ STOPWATCH
 TIMER
 ```
 
-### Live monitor examples
+### Live monitoring layouts
 
-The attached change logs show extended live display behavior such as:
-
-- AP tracker list with RSSI trend arrows
-- APST tracker list with AP and station counts
-- autoscan live AP list
-- packet monitor graph
-- APST monitor graph
-
-Typical live formats used by the firmware include:
+#### AP tracker
 
 ```text
 APs [15]       PKTs [642]
@@ -432,12 +408,16 @@ APs [15]       PKTs [642]
  TP-Link        -61 ↓
 ```
 
+#### APST tracker
+
 ```text
 APs [15]       ST [5]
 >Home WiFi      -37 ↑ ST [5]
  Office         -45 ↑ ST [2]
  TP-Link        -61 ↓ ST [7]
 ```
+
+#### APST monitor
 
 ```text
 AP [0] ST [0]
@@ -447,206 +427,243 @@ AP [0] ST [0]
 
 ### Common on-screen labels
 
-The firmware includes screen labels such as:
-
-- `SELECT`
-- `PACKET MONITOR`
-- `APST MONITOR`
-- `CLOCK`
-- `CLOCK DISPLAY`
-- `SET CLOCK`
-- `STOPWATCH`
-- `TIMER`
-- `SCAN AP + ST`
-- `SCAN APs`
-- `SCAN Stations`
-- `AUTOSCAN`
-- `AP TRACKER`
-- `APST TRACKER`
-- `DEAUTH`
-- `BEACON`
-- `PROBE`
-- `FISH`
-- `CAPAD`
-- `START`
-- `STOP`
-
----
+* `SELECT`
+* `PACKET MONITOR`
+* `APST MONITOR`
+* `CLOCK`
+* `CLOCK DISPLAY`
+* `SET CLOCK`
+* `STOPWATCH`
+* `TIMER`
+* `SCAN AP + ST`
+* `SCAN APs`
+* `SCAN Stations`
+* `AUTOSCAN`
+* `AP TRACKER`
+* `APST TRACKER`
+* `DEAUTH`
+* `BEACON`
+* `PROBE`
+* `FISH`
+* `CAPAD`
+* `START`
+* `STOP`
 
 ## Menu Hierarchy
 
 ### Main menu
 
-- SCAN
-- SELECT
-- ATTACK
-- PACKET MONITOR
-- APST MONITOR
-- CLOCK
+* SCAN
+* SELECT
+* ATTACK
+* PACKET MONITOR
+* APST MONITOR
+* CLOCK
 
 ### Scan
 
-- SCAN AP + ST
-- SCAN APs
-- SCAN Stations
-- AUTOSCAN
-- AP TRACKER
-- APST TRACKER
+* SCAN AP + ST
+* SCAN APs
+* SCAN Stations
+* AUTOSCAN
+* AP TRACKER
+* APST TRACKER
 
 ### Select
 
-- APs
-- Stations
-- SSIDs
-- Names
+* APs
+* Stations
+* SSIDs
+* Names
 
 ### Attack
 
-- DEAUTH
-- BEACON
-- PROBE
-- FISH
-- CAPAD
-- START
-- STOP
+* DEAUTH
+* BEACON
+* PROBE
+* FISH
+* CAPAD
+* START
+* STOP
 
 ### Clock
 
-- CLOCK DISPLAY
-- SET CLOCK
-- STOPWATCH
-- TIMER
-
----
+* CLOCK DISPLAY
+* SET CLOCK
+* STOPWATCH
+* TIMER
 
 ## Web Interface
 
-The firmware serves a local browser interface from SPIFFS. It is intended for offline use and exposes the same internal data used by the OLED and CLI.
+G-Shark includes a local browser interface served from SPIFFS.
 
-### Likely web assets
+### Web interface capabilities
 
-- page HTML
-- JS controllers
-- CSS
-- image assets
+* local asset hosting
+* custom HTML, CSS, JavaScript pages
+* embedded status pages
+* device configuration pages
+* runtime monitoring pages
+* scan and selection views
+* offline operation
+* UI synchronization with OLED state
 
-### Web UI responsibilities
+### Web assets
 
-- show scan results
-- show selected AP/station lists
-- show settings
-- show runtime status
-- control available firmware functions via HTTP
+| Asset type | Examples                            |
+| ---------- | ----------------------------------- |
+| HTML       | index, attack, info, settings       |
+| JavaScript | site, scan, attack, settings, ssids |
+| CSS        | shared styling                      |
+| Images     | logos and artwork                   |
+| Audio      | locally stored media                |
 
-### Captive portal behavior
+### Portal framework
 
-The firmware includes a captive portal page system. In a legitimate deployment, this means connected clients can be redirected to a local landing page served from the device.
-
-> This README intentionally documents the portal as a local management interface and does not describe credential-harvesting or phishing workflows.
-
----
+The captive-portal framework is configurable and can be tailored with custom web pages stored on the device. The firmware can exchange data between the browser interface and the embedded application, and those values can be reflected on the OLED, in status views, or in other runtime screens.
 
 ## CLI Reference
 
-The serial CLI supports:
+The serial CLI provides direct control over scan, selection, settings, display, LED, file, and script functions.
 
-- help and info commands
-- scanning
-- selection management
-- saving/loading lists and settings
-- file management in SPIFFS
-- LED control
-- screen control
-- scripted command execution
-- packet transmission commands
-- attack commands
+### Typical command groups
 
-### Representative syntax from `language.h`
+| Group     | Purpose                                |
+| --------- | -------------------------------------- |
+| System    | help, info, reboot, reset, status      |
+| Scan      | scan, show, stop                       |
+| Attack    | attack, start, stop, packet monitoring |
+| Selection | add, remove, select, deselect, clear   |
+| Settings  | get, set, save, load                   |
+| Display   | screen, draw, buttontest               |
+| LED       | led, enable, disable                   |
+| Files     | load, save, delete, write, print       |
+| Scripts   | script, run                            |
+| Wi-Fi     | startap, stopap, rename                |
+| Utility   | random, replace, copy, delay           |
+
+### Representative command vocabulary
 
 ```text
-scan [<all/aps/stations>] [-t <time>] [-c <continue-time>] [-ch <channel>]
-show [selected] [<all/aps/stations/names/ssids>]
-select [<all/aps/stations/names>] [<id>]
-deselect [<all/aps/stations/names>] [<id>]
-add ssid <ssid> [-wpa2] [-cl <clones>]
-add name <name> [-ap <id>] [-s]
-attack [beacon] [deauth] [deauthall] [probe] [nooutput] [-t <timeout>]
-stop <all/scan/attack/script>
-led <r> <g> <b>
-led <#rrggbb>
-screen <on/off>
-screen mode <menu/packetmonitor/buttontest/loading>
+help
+info
+sysinfo
+status
+reboot
+reset
+format
+scan
+show
+stop
+start
+attack
+send
+packetmonitor
+add
+remove
+select
+deselect
+clear
+print
+set
+get
+save
+load
+settings
+random
+replace
+copy
+delete
+write
+run
+script
+led
+screen
+draw
+loadingscreen
+buttontest
+startap
+stopap
+rename
+enable
+disable
+custom
+delay
+on
+off
 ```
-
----
 
 ## Scan Architecture
 
-The scan engine is split into multiple runtime modes:
+The scan subsystem is responsible for discovering and organizing Wi-Fi data for the rest of the firmware.
 
-- AP scan
-- station scan
-- combined AP + station scan
-- autoscan
-- AP tracker
-- APST tracker
-- APST monitor
+### Scan modes
 
-### Shared data structures
+* AP scan
+* station scan
+* combined AP + station scan
+* autoscan
+* AP tracker
+* APST tracker
+* APST monitor
 
-- Access point database
-- Station database
-- SSID list
-- Name list
+### Shared data model
+
+| Database     | Role                                |
+| ------------ | ----------------------------------- |
+| AccessPoints | discovered APs and selection state  |
+| Stations     | discovered clients and associations |
+| SSIDs        | generated or stored SSID entries    |
+| Names        | stored labels and aliases           |
 
 ### Runtime behavior
 
-- scan modes update the shared databases
-- the display reads from those databases
-- the CLI and web UI can inspect or modify the same state
-- the attack engine consumes selected targets from those lists
+* scan modes update the shared databases
+* the display reads from those databases
+* the CLI and web UI can inspect the same state
+* the attack engine consumes selected targets from those lists
 
-### Tracker / monitor extensions
+### Tracker extensions
 
-The attached change logs show later additions such as:
+The later UI extensions documented in the change history add:
 
-- persistent autoscan history
-- per-AP expiry
-- auto-selection of scanned APs
-- live AP tracker
-- APST tracker with station counts
-- APST monitor graph mode
-- background scan continuation behavior
-
-These are documented in the change history but should be validated against the final source tree before flashing a release build.
-
----
+* persistent autoscan history
+* per-AP expiry
+* auto-selection of scanned APs
+* live AP tracker
+* APST tracker with station counts
+* APST monitor graph mode
+* background scan continuation behavior
 
 ## Attack Architecture
 
 The attack subsystem uses raw Wi-Fi frame generation through ESP8266 Wi-Fi APIs.
 
-### Supported methods exposed by the firmware
+### Supported methods
 
-- deauthentication
-- beacon frame generation
-- probe frame generation
-- CAPAD / captive-portal related feature entry
-- start / stop control
+* deauthentication
+* beacon frame generation
+* probe frame generation
+* CAPAD
+* start / stop control
 
 ### High-level flow
 
-1. user selects targets
-2. the attack engine reads the selected APs / stations / SSIDs
-3. the firmware builds management frames
-4. the ESP8266 transmits raw packets
-5. counters and status update on the OLED / CLI / web UI
+1. User selects targets
+2. The attack engine reads the selected APs, stations, and SSIDs
+3. The firmware builds management frames
+4. The ESP8266 transmits raw packets
+5. Counters and status update on the OLED, CLI, and web UI
 
-### Important note
+### Attack control data
 
-The repository contains attack-oriented functionality. This README documents the code that exists in the project, but it does not provide operational instructions for misuse.
-
----
+| Input         | Role                                  |
+| ------------- | ------------------------------------- |
+| Access points | target selection                      |
+| Stations      | target selection                      |
+| SSIDs         | generated or cloned identifiers       |
+| Settings      | timeout, behavior, output preferences |
+| Wi-Fi driver  | raw frame transmission                |
 
 ## Workflow Summary
 
@@ -654,141 +671,118 @@ The repository contains attack-oriented functionality. This README documents the
 
 ```text
 Power on
--> bootloader
--> setup()
--> SPIFFS / EEPROM / UI init
--> intro screen
--> main menu
+→ bootloader
+→ setup()
+→ SPIFFS / EEPROM / UI init
+→ intro screen
+→ main menu
 ```
 
 ### Scan flow
 
 ```text
 Open SCAN
--> choose scan mode
--> update AP/station databases
--> render live list / monitor
+→ choose scan mode
+→ update AP/station databases
+→ render live list or monitor
 ```
 
 ### Select flow
 
 ```text
 Open SELECT
--> view APs / Stations / SSIDs / Names
--> choose targets
--> selected items are used by other modules
+→ view APs / Stations / SSIDs / Names
+→ choose targets
+→ selected items are used by other modules
 ```
 
 ### Attack flow
 
 ```text
 Open ATTACK
--> choose method
--> start
--> packet generation
--> packet transmit
--> status / counters
+→ choose method
+→ start
+→ packet generation
+→ packet transmit
+→ status and counters
 ```
 
 ### Web flow
 
 ```text
 Connect browser
--> local HTTP page
--> load from SPIFFS
--> request JSON status
--> update controls
+→ local HTTP page
+→ load from SPIFFS
+→ request JSON status
+→ update controls
 ```
 
 ### CLI flow
 
 ```text
 Open serial terminal
--> enter command
--> parser dispatches command
--> state updates
--> output printed to serial
+→ enter command
+→ parser dispatches command
+→ state updates
+→ output printed to serial
 ```
-
----
 
 ## Build / Flash Notes
 
 ### Platform
 
-- Arduino IDE / ESP8266 core
-- ESP8266 board profile
+* Arduino IDE
+* ESP8266 board profile
 
-### Libraries expected by the source
+### Common library dependencies
 
-- OLED driver library
-- DS3231 library
-- SimpleButton
-- SPI / Wire / FS
-- ESP8266 Wi-Fi / Arduino core
+* OLED driver library
+* DS3231 library
+* SimpleButton
+* SPI / Wire / FS
+* ESP8266 Wi-Fi / Arduino core
 
-### Practical notes
+### Compile-time configuration
 
-- compile-time board macros in `A_config.h` determine the pinout and screen variant
-- the OLED library version matters for `String` / `char` conversions
-- many runtime features depend on the active profile in `A_config.h`
+The active board profile and screen configuration are selected in `A_config.h`. That file determines:
 
----
+* display driver
+* pin mapping
+* button layout
+* LED behavior
+* optional peripherals
+* runtime defaults
 
 ## Files Included
 
 ### Core source
 
-- `esp8266_deauther.ino`
-- `DisplayUI.cpp/.h`
-- `Scan.cpp/.h`
-- `Attack.cpp/.h`
-- `CLI.cpp/.h`
-- `Accesspoints.cpp/.h`
-- `Stations.cpp/.h`
-- `SSIDs.cpp/.h`
-- `Names.cpp/.h`
-- `settings.cpp/.h`
-- `led.cpp/.h`
-- `wifi.cpp/.h`
-- `language.h`
-- `A_config.h`
+* `esp8266_deauther.ino`
+* `DisplayUI.cpp/.h`
+* `Scan.cpp/.h`
+* `Attack.cpp/.h`
+* `CLI.cpp/.h`
+* `Accesspoints.cpp/.h`
+* `Stations.cpp/.h`
+* `SSIDs.cpp/.h`
+* `Names.cpp/.h`
+* `settings.cpp/.h`
+* `led.cpp/.h`
+* `wifi.cpp/.h`
+* `language.h`
+* `A_config.h`
 
 ### Assets
 
-- `data/web/`
-- `data/nameme/`
-- `data/logo.png`
-- `data/instapage.jpg`
-- `data/music.mp3`
+* `data/web/`
+* `data/nameme/`
+* `data/logo.png`
+* `data/instapage.jpg`
+* `data/music.mp3`
 
-### Reference / bundled libraries
+### Bundled support files
 
-- OLED driver sources
-- DS3231 driver
-- SimpleButton
-- other bundled support headers
-
----
-
-## Project Notes
-
-This repository contains substantial UI evolution in the attached change logs, including:
-
-- new live scan modes
-- autoscan persistence behavior
-- AP/ST tracker views
-- APST monitor screen
-- clock / stopwatch / timer screens
-- intro / splash handling fixes
-- menu restructuring
-- select-menu cleanup
-- scan performance refinements
-
-Those logs are useful as design history, but the README above documents the verified firmware structure and the operational modules in the repository.
-
----
-
-## License
-
-The source headers indicate MIT licensing for the upstream codebase. Check the repository license file for the exact terms before redistribution.
+* display driver sources
+* RTC support
+* button support
+* helper headers
