@@ -1,6 +1,6 @@
 # G-Shark
 
-**Version:** 1.0  
+**Version:** 3.0  
 **Platform:** ESP8266 (ESP-12E / ESP-12F)  
 **Category:** Wireless Security Research Platform  
 **Architecture:** Embedded Standalone Firmware  
